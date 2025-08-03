@@ -1,10 +1,9 @@
 use reqwest::Client;
 use serde::{Serialize, Deserialize};
 use serde_json::{json, Value};
-use std::collections::HashMap;
 use futures::StreamExt;
 use tokio::sync::mpsc;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 
 use crate::models::{AIConfig, AnalysisReport};
 
