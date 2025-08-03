@@ -60,7 +60,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 ENV RUST_LOG=info \
     HOST=0.0.0.0 \
     PORT=8080 \
-    DATABASE_URL=sqlite:/app/data/stock_analyzer.db \
     DATABASE_ENABLE_MIGRATIONS=true
 
 # Run the application
