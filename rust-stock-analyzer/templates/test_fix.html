@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>配置页面修复测试</title>
+</head>
+<body>
+    <h1>配置页面修复测试</h1>
+    <div id="status">正在测试...</div>
+    
+    <script>
+        async function testConfigPage() {
+            const status = document.getElementById('status');
+            
+            try {
+                console.log('开始测试配置页面修复...');
+                
+                // 模拟配置页面的loadConfig函数
+                const [aiConfig, authConfig, systemConfig] = await Promise.all([
+                    fetch('/api/config/ai').then(r => r.json()),
+                    fetch('/api/config/auth').then(r => r.json()),
+                    fetch('/api/config/system').then(r => r.json())
+                ]);
+
+                const currentConfig = { ai: aiConfig, auth: authConfig, system: systemConfig };
+                
+                // 测试修复后的updateUI函数逻辑
+                const aiData = currentConfig.ai?.data || {};
+                const authData = currentConfig.auth?.data || {};
+                const systemData = currentConfig.system?.data || {};
+                
+                console.log('AI数据:', aiData);
+                console.log('认证数据:', authData);
+                console.log('系统数据:', systemData);
+                
+                // 验证数据访问
+                const tests = [
+                    { name: 'AI提供商', value: aiData.provider, expected: 'glm' },
+                    { name: 'AI模型', value: aiData.model, expected: 'glm-4.5-air' },
+                    { name: 'API密钥存在', value: !!aiData.api_key, expected: true },
+                    { name: 'AI启用状态', value: aiData.enabled, expected: true },
+                    { name: '认证启用状态', value: authData.enabled, expected: false },
+                    { name: '系统Akshare地址', value: systemData.akshare_url, expected: 'http://localhost:5000' }
+                ];
+                
+                let allPassed = true;
+                let results = '<h2>测试结果:</h2><ul>';
+                
+                tests.forEach(test => {
+                    const passed = test.value === test.expected;
+                    allPassed = allPassed && passed;
+                    results += `<li style="color: ${passed ? 'green' : 'red'}">
+                        ${test.name}: ${passed ? '✅ 通过' : '❌ 失败'} 
+                        (期望: ${test.expected}, 实际: ${test.value})
+                    </li>`;
+                });
+                
+                results += '</ul>';
+                
+                if (allPassed) {
+                    results += '<h3 style="color: green">✅ 所有测试通过！配置页面修复成功！</h3>';
+                    results += '<p>现在配置页面应该能够正确加载和显示配置数据。</p>';
+                } else {
+                    results += '<h3 style="color: red">❌ 部分测试失败，需要进一步检查。</h3>';
+                }
+                
+                status.innerHTML = results;
+                
+            } catch (error) {
+                console.error('测试失败:', error);
+                status.innerHTML = `
+                    <h2 style="color: red">❌ 测试失败</h2>
+                    <p>错误信息: ${error.message}</p>
+                    <p>请检查服务器连接和API端点。</p>
+                `;
+            }
+        }
+        
+        // 页面加载时运行测试
+        window.addEventListener('load', testConfigPage);
+    </script>
+</body>
+</html>

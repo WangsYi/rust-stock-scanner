@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>配置测试页面</title>
+</head>
+<body>
+    <h1>配置测试页面</h1>
+    <div id="result">正在加载配置...</div>
+    
+    <script>
+        async function testConfig() {
+            try {
+                console.log('开始加载配置...');
+                const [aiConfig, authConfig, systemConfig] = await Promise.all([
+                    fetch('/api/config/ai').then(r => r.json()),
+                    fetch('/api/config/auth').then(r => r.json()),
+                    fetch('/api/config/system').then(r => r.json())
+                ]);
+                
+                console.log('AI配置:', aiConfig);
+                console.log('认证配置:', authConfig);
+                console.log('系统配置:', systemConfig);
+                
+                const currentConfig = { ai: aiConfig, auth: authConfig, system: systemConfig };
+                
+                // 测试数据访问
+                const aiData = currentConfig.ai?.data || {};
+                const authData = currentConfig.auth?.data || {};
+                const systemData = currentConfig.system?.data || {};
+                
+                const result = document.getElementById('result');
+                result.innerHTML = 
+                    '<h2>配置加载成功！</h2>' +
+                    '<h3>AI配置:</h3>' +
+                    '<p>提供商: ' + (aiData.provider || '未设置') + '</p>' +
+                    '<p>模型: ' + (aiData.model || '未设置') + '</p>' +
+                    '<p>API密钥: ' + (aiData.api_key ? '已设置' : '未设置') + '</p>' +
+                    '<p>启用状态: ' + (aiData.enabled ? '启用' : '禁用') + '</p>' +
+                    
+                    '<h3>认证配置:</h3>' +
+                    '<p>启用状态: ' + (authData.enabled ? '启用' : '禁用') + '</p>' +
+                    '<p>会话超时: ' + (authData.session_timeout || '未设置') + '秒</p>' +
+                    
+                    '<h3>系统配置:</h3>' +
+                    '<p>Akshare地址: ' + (systemData.akshare_url || '未设置') + '</p>' +
+                    '<p>最大工作线程: ' + (systemData.max_workers || '未设置') + '</p>';
+                
+            } catch (error) {
+                console.error('配置加载失败:', error);
+                document.getElementById('result').innerHTML = `
+                    <h2>配置加载失败</h2>
+                    <p>错误信息: ${error.message}</p>
+                    <p>请检查服务器连接和API端点。</p>
+                `;
+            }
+        }
+        
+        // 页面加载时测试配置
+        window.addEventListener('load', testConfig);
+    </script>
+</body>
+</html>

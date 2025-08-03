@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>股票分析系统 - 批量分析</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header-buttons {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            text-decoration: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+            font-weight: 600;
+            backdrop-filter: blur(10px);
+        }
+
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .form-section {
+            background: white;
+            border-radius: 15px;
+            padding: 2.5rem;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .form-section h2 {
+            color: #2c3e50;
+            margin-bottom: 2rem;
+            font-size: 1.8rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .form-section h2::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 3px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 2px;
+        }
+
+        .form-group {
+            margin-bottom: 2rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.75rem;
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 1.1rem;
+        }
+
+        .form-group textarea {
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid #e1e8ed;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-family: 'Consolas', 'Monaco', monospace;
+            resize: vertical;
+            min-height: 150px;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-group textarea::placeholder {
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .checkbox-group:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: #667eea;
+        }
+
+        .checkbox-group label {
+            margin-bottom: 0;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 2rem;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 1rem 2.5rem;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+            box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+        }
+
+        .btn-secondary:hover {
+            box-shadow: 0 6px 20px rgba(108, 117, 125, 0.4);
+        }
+
+        .progress-section {
+            background: white;
+            border-radius: 10px;
+            padding: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+            display: none;
+        }
+
+        .progress-bar {
+            background: #f0f0f0;
+            border-radius: 10px;
+            height: 20px;
+            overflow: hidden;
+            margin: 1rem 0;
+        }
+
+        .progress-fill {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100%;
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .progress-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .log-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            padding: 0.5rem;
+            border-bottom: 1px solid #eee;
+            font-size: 0.9rem;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-entry.success {
+            color: #28a745;
+        }
+
+        .log-entry.error {
+            color: #dc3545;
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2rem;
+        }
+
+        .result-card {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .result-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .result-score {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .result-content {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .error {
+            background: #fee;
+            color: #c00;
+            padding: 1rem;
+            border-radius: 5px;
+            margin: 1rem 0;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .container {
+                padding: 1rem;
+            }
+            
+            .results-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div>
+                    <h1>🚀 批量股票分析</h1>
+                    <p>基于多维度数据的智能分析平台</p>
+                </div>
+                <div class="header-buttons">
+                    <a href="/" class="nav-btn">📊 单股分析</a>
+                    <a href="/config" class="nav-btn">⚙️ AI配置</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="form-section">
+            <h2>批量分析</h2>
+            <form id="batchForm">
+                <div class="form-group">
+                    <label for="stockCodes">📝 股票代码（每行一个）</label>
+                    <textarea id="stockCodes" name="stockCodes" placeholder="请输入股票代码，每行一个
+
+例如：
+000001  (平安银行)
+600036  (招商银行)
+300019  (硅宝科技)
+
+最多支持50只股票" required></textarea>
+                </div>
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="enableAI" name="enableAI" checked>
+                        <label for="enableAI">🤖 启用AI智能分析（提供深度投资建议）</label>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn" id="analyzeBtn">
+                        <span>🚀</span>
+                        <span>开始批量分析</span>
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="clearForm()">
+                        <span>🗑️</span>
+                        <span>清空表单</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div id="progressSection" class="progress-section">
+            <h3>分析进度</h3>
+            <div class="progress-info">
+                <div>
+                    <strong id="currentStock">-</strong>
+                </div>
+                <div id="progressText">0%</div>
+            </div>
+            <div class="progress-bar">
+                <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+            </div>
+            <div class="progress-stats">
+                <div class="stat-item">
+                    <div class="stat-value" id="totalCount">0</div>
+                    <div class="stat-label">总数</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="completedCount">0</div>
+                    <div class="stat-label">已完成</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="failedCount">0</div>
+                    <div class="stat-label">失败</div>
+                </div>
+            </div>
+            <div class="log-section">
+                <div id="logContainer">
+                    <div class="log-entry">准备开始分析...</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="resultsSection" style="display: none;">
+            <h3>分析结果</h3>
+            <div id="resultsGrid" class="results-grid">
+                <!-- Results will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let taskId = null;
+
+        function connectWebSocket() {
+            ws = new WebSocket(`ws://${window.location.host}/ws`);
+            
+            ws.onmessage = function(event) {
+                const update = JSON.parse(event.data);
+                updateProgress(update);
+            };
+            
+            ws.onclose = function() {
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+
+        document.getElementById('batchForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const stockCodesText = document.getElementById('stockCodes').value.trim();
+            const enableAI = document.getElementById('enableAI').checked;
+            
+            if (!stockCodesText) {
+                alert('请输入股票代码');
+                return;
+            }
+
+            const stockCodes = stockCodesText.split('\n')
+                .map(code => code.trim())
+                .filter(code => code.length > 0);
+
+            if (stockCodes.length === 0) {
+                alert('请输入有效的股票代码');
+                return;
+            }
+
+            if (stockCodes.length > 50) {
+                alert('一次分析最多支持50只股票');
+                return;
+            }
+
+            // Show progress section
+            document.getElementById('progressSection').style.display = 'block';
+            document.getElementById('resultsSection').style.display = 'none';
+
+            try {
+                const response = await fetch('/api/batch/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        stock_codes: stockCodes,
+                        enable_ai: enableAI
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    taskId = result.data;
+                    startProgressMonitoring();
+                } else {
+                    alert('启动分析失败：' + result.error);
+                }
+            } catch (error) {
+                alert('请求失败：' + error.message);
+            }
+        });
+
+        async function startProgressMonitoring() {
+            if (!taskId) return;
+
+            connectWebSocket();
+
+            // Poll for updates as fallback
+            const interval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/api/batch/status/${taskId}`);
+                    const result = await response.json();
+
+                    if (result.success) {
+                        updateProgressFromStatus(result.data);
+                        
+                        if (result.data.status === '已完成') {
+                            clearInterval(interval);
+                            showResults();
+                        }
+                    }
+                } catch (error) {
+                    console.error('获取进度失败：', error);
+                }
+            }, 1000);
+        }
+
+        function updateProgress(update) {
+            document.getElementById('currentStock').textContent = update.current_stock || '-';
+            document.getElementById('progressText').textContent = update.percentage.toFixed(1) + '%';
+            document.getElementById('progressFill').style.width = update.percentage + '%';
+            
+            document.getElementById('totalCount').textContent = update.total;
+            document.getElementById('completedCount').textContent = update.current;
+            document.getElementById('failedCount').textContent = Math.max(0, update.current - update.completed);
+
+            if (update.message) {
+                addLogEntry(update.message, update.status === '已完成' ? 'success' : '');
+            }
+        }
+
+        function updateProgressFromStatus(status) {
+            document.getElementById('currentStock').textContent = status.current_stock || '-';
+            document.getElementById('progressText').textContent = status.progress.toFixed(1) + '%';
+            document.getElementById('progressFill').style.width = status.progress + '%';
+            
+            document.getElementById('totalCount').textContent = status.total_stocks;
+            document.getElementById('completedCount').textContent = status.completed;
+            document.getElementById('failedCount').textContent = status.failed;
+        }
+
+        function addLogEntry(message, type = '') {
+            const logContainer = document.getElementById('logContainer');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString('zh-CN')}] ${message}`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        async function showResults() {
+            try {
+                const response = await fetch(`/api/batch/status/${taskId}`);
+                const result = await response.json();
+
+                if (result.success && result.data.status === '已完成') {
+                    // Here you would typically fetch the actual results
+                    // For now, we'll show a completion message
+                    addLogEntry('批量分析已完成！', 'success');
+                    
+                    // Hide progress and show results
+                    document.getElementById('progressSection').style.display = 'none';
+                    document.getElementById('resultsSection').style.display = 'block';
+                    
+                    // Populate results (this would be replaced with actual result fetching)
+                    document.getElementById('resultsGrid').innerHTML = `
+                        <div class="result-card">
+                            <div class="result-header">
+                                <div class="result-title">分析完成</div>
+                                <div class="result-score">100%</div>
+                            </div>
+                            <div class="result-content">
+                                <p>批量分析任务已完成！所有股票的分析结果已生成。</p>
+                                <p>完成股票：${result.data.completed}只</p>
+                                <p>失败股票：${result.data.failed}只</p>
+                            </div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('获取结果失败：', error);
+            }
+        }
+
+        function clearForm() {
+            document.getElementById('stockCodes').value = '';
+            document.getElementById('enableAI').checked = true;
+            document.getElementById('progressSection').style.display = 'none';
+            document.getElementById('resultsSection').style.display = 'none';
+        }
+
+        function updateToolbarClock() {
+            const now = new Date();
+            const timeString = now.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            const clockElement = document.getElementById('currentTime');
+            if (clockElement) {
+                clockElement.textContent = timeString;
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize toolbar clock
+            updateToolbarClock();
+            setInterval(updateToolbarClock, 1000);
+            
+            // Initialize WebSocket
+            connectWebSocket();
+            
+            // Initialize form
+            document.getElementById('batchForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const stockCodesText = document.getElementById('stockCodes').value.trim();
+                const enableAI = document.getElementById('enableAI').checked;
+                
+                if (!stockCodesText) {
+                    alert('请输入股票代码');
+                    return;
+                }
+
+                const stockCodes = stockCodesText.split('\n')
+                    .map(code => code.trim())
+                    .filter(code => code.length > 0);
+
+                if (stockCodes.length === 0) {
+                    alert('请输入有效的股票代码');
+                    return;
+                }
+
+                if (stockCodes.length > 50) {
+                    alert('一次分析最多支持50只股票');
+                    return;
+                }
+
+                // Show progress section
+                document.getElementById('progressSection').style.display = 'block';
+                document.getElementById('resultsSection').style.display = 'none';
+                document.getElementById('taskIdBadge').textContent = '准备中...';
+
+                try {
+                    const response = await fetch('/api/batch/analyze', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            stock_codes: stockCodes,
+                            enable_ai: enableAI
+                        })
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        taskId = result.data;
+                        document.getElementById('taskIdBadge').textContent = taskId;
+                        addLogEntry('批量分析任务已启动', 'success');
+                        startProgressMonitoring();
+                    } else {
+                        alert('启动分析失败：' + result.error);
+                        addLogEntry('启动失败：' + result.error, 'error');
+                    }
+                } catch (error) {
+                    alert('请求失败：' + error.message);
+                    addLogEntry('请求失败：' + error.message, 'error');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

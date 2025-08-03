@@ -1,0 +1,79 @@
+# 开发环境Dockerfile
+FROM rust:1.75-slim AS builder
+
+# Install build dependencies including development tools
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    curl \
+    vim \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install cargo-watch for hot reloading
+RUN cargo install cargo-watch
+
+# Set working directory
+WORKDIR /app
+
+# Copy Cargo files
+COPY Cargo.toml Cargo.lock ./
+
+# Copy source code
+COPY src ./src
+COPY templates ./templates
+
+# Build the application
+RUN cargo build
+
+# Runtime stage
+FROM debian:bookworm-slim
+
+# Install runtime and development dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    curl \
+    vim \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd -m -u 1000 stockuser
+
+# Set working directory
+WORKDIR /app
+
+# Copy binary from builder stage
+COPY --from=builder /usr/local/cargo/bin/cargo-watch /usr/local/bin/
+COPY --from=builder /app/target/debug/rust-stock-analyzer .
+COPY --from=builder /app/templates ./templates
+
+# Copy source code for hot reloading
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/Cargo.toml ./Cargo.toml
+COPY --from=builder /app/Cargo.lock ./Cargo.lock
+
+# Create necessary directories
+RUN mkdir -p /app/data && \
+    chown -R stockuser:stockuser /app
+
+# Switch to non-root user
+USER stockuser
+
+# Expose ports
+EXPOSE 8080
+EXPOSE 9181
+
+# Set environment variables
+ENV RUST_LOG=debug \
+    HOST=0.0.0.0 \
+    PORT=8080 \
+    DATABASE_URL=sqlite:/app/data/stock_analyzer.db \
+    DATABASE_ENABLE_MIGRATIONS=true
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/api/health || exit 1
+
+# Run the application with hot reload
+CMD ["cargo", "watch", "-x", "run"]

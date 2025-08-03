@@ -1,0 +1,156 @@
+# 开发环境Docker Compose配置
+version: '3.8'
+
+services:
+  # Rust Stock Analyzer (开发模式)
+  stock-analyzer:
+    build:
+      context: ./rust-stock-analyzer
+      dockerfile: Dockerfile.dev
+    container_name: stock-analyzer-dev
+    ports:
+      - "8080:8080"
+      - "9181:9181"  # Metrics端口
+    environment:
+      - RUST_LOG=debug
+      - HOST=0.0.0.0
+      - PORT=8080
+      - DATABASE_URL=postgres://stockuser:stockpass@postgres:5432/stock_analyzer_dev
+      - DATABASE_MAX_CONNECTIONS=5
+      - DATABASE_ENABLE_MIGRATIONS=true
+      - AKSERVICE_URL=http://akshare-service:5000
+      - AKSERVICE_TIMEOUT=30
+      - MAX_WORKERS=4
+      - TIMEOUT_SECONDS=60
+      - TECHNICAL_WEIGHT=0.5
+      - FUNDAMENTAL_WEIGHT=0.3
+      - SENTIMENT_WEIGHT=0.2
+      - TECHNICAL_PERIOD=60
+      - SENTIMENT_PERIOD=30
+      - AI_ENABLED=true
+      - AI_TIMEOUT=60
+      - AUTH_ENABLED=false
+      - ENABLE_METRICS=true
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./rust-stock-analyzer/src:/app/src
+      - ./rust-stock-analyzer/templates:/app/templates
+      - ./rust-stock-analyzer/Cargo.toml:/app/Cargo.toml
+      - ./rust-stock-analyzer/Cargo.lock:/app/Cargo.lock
+      - cargo_cache:/usr/local/cargo/registry
+      - stock_analyzer_dev_data:/app/data
+    depends_on:
+      - postgres
+      - akshare-service
+      - redis
+    restart: unless-stopped
+    networks:
+      - stock-dev-network
+    command: ["cargo", "watch", "-x", "run"]
+
+  # PostgreSQL Database (开发模式)
+  postgres:
+    image: postgres:15-alpine
+    container_name: stock-postgres-dev
+    environment:
+      - POSTGRES_DB=stock_analyzer_dev
+      - POSTGRES_USER=stockuser
+      - POSTGRES_PASSWORD=stockpass
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - stock-dev-network
+
+  # AKShare Python Service (开发模式)
+  akshare-service:
+    build:
+      context: .
+      dockerfile: akshare-service.Dockerfile.dev
+    container_name: akshare-service-dev
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - AKSHARE_CACHE_ENABLED=true
+      - AKSHARE_CACHE_TTL=60
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./akshare_service.py:/app/akshare_service.py
+      - ./requirements.txt:/app/requirements.txt
+      - akshare_dev_cache:/app/cache
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - stock-dev-network
+
+  # Redis (开发模式)
+  redis:
+    image: redis:7-alpine
+    container_name: stock-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    restart: unless-stopped
+    networks:
+      - stock-dev-network
+    command: redis-server --appendonly yes
+
+  # pgAdmin (数据库管理工具 - 可选)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: stock-pgadmin-dev
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@example.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    ports:
+      - "8081:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - stock-dev-network
+    profiles:
+      - tools
+
+  # Redis Commander (Redis管理工具 - 可选)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: stock-redis-commander-dev
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8082:8081"
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - stock-dev-network
+    profiles:
+      - tools
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+  akshare_dev_cache:
+    driver: local
+  stock_analyzer_dev_data:
+    driver: local
+  cargo_cache:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  stock-dev-network:
+    driver: bridge
