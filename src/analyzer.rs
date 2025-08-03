@@ -76,9 +76,9 @@ impl StockAnalyzer {
 
         let recommendation = self.generate_recommendation(&scores, &technical);
         
-        let ai_analysis = if enable_ai {
+          let ai_analysis = if enable_ai {
             let ai_service = self.ai_service.read().await;
-            ai_service.generate_analysis(&AnalysisReport {
+            let report_for_ai = AnalysisReport {
                 stock_code: stock_code.to_string(),
                 stock_name: stock_name.clone(),
                 market: market.clone(),
@@ -95,9 +95,37 @@ impl StockAnalyzer {
                     total_news_count: news_data.len() as i32,
                     analysis_completeness: "完整".to_string(),
                 },
-            }).await.unwrap_or_else(|_| self.generate_fallback_analysis(stock_code, &price_info, &fundamental_data, &sentiment_data, &market))
+            };
+            
+            match ai_service.generate_analysis(&report_for_ai).await {
+                Ok(analysis) => analysis,
+                Err(_) => {
+                    // Use AI service's fallback analysis instead of analyzer's
+                    ai_service.generate_fallback_analysis(&report_for_ai)
+                }
+            }
         } else {
-            self.generate_fallback_analysis(stock_code, &price_info, &fundamental_data, &sentiment_data, &market)
+            // Even when AI is disabled, use the detailed fallback analysis from AI service
+            let ai_service = self.ai_service.read().await;
+            let report_for_ai = AnalysisReport {
+                stock_code: stock_code.to_string(),
+                stock_name: stock_name.clone(),
+                market: market.clone(),
+                analysis_date: Utc::now(),
+                price_info: price_info.clone(),
+                technical: technical.clone(),
+                fundamental: fundamental_data.clone(),
+                sentiment: sentiment_data.clone(),
+                scores: scores.clone(),
+                recommendation: recommendation.clone(),
+                ai_analysis: String::new(),
+                data_quality: DataQuality {
+                    financial_indicators_count: fundamental_data.financial_indicators.len() as i32,
+                    total_news_count: news_data.len() as i32,
+                    analysis_completeness: "完整".to_string(),
+                },
+            };
+            ai_service.generate_fallback_analysis(&report_for_ai)
         };
 
         let report = AnalysisReport {

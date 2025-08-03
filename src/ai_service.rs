@@ -561,24 +561,123 @@ impl AIService {
         )
     }
 
-    fn generate_fallback_analysis(&self,
+    pub fn generate_fallback_analysis(&self,
         report: &AnalysisReport,
     ) -> String {
+        let rsi_status = if report.technical.rsi > 70.0 { "超买" } else if report.technical.rsi < 30.0 { "超卖" } else { "正常" };
+        let trend_strength = match report.technical.adx {
+            x if x > 50.0 => "强趋势",
+            x if x > 25.0 => "中等趋势",
+            _ => "弱趋势"
+        };
+        
         format!(
-            "基于对{}的综合分析：\n\n当前股价：{:.2}元，近期涨跌幅：{:.2}%\n\n技术面分析：\n- RSI指标：{:.2}，{}\n- MACD信号：{}\n- 均线系统：{}\n\n基本面亮点：\n- 市盈率：{:.2}倍\n- 市净率：{:.2}倍\n- 行业：{}\n\n市场情绪：{:.2}（{}）\n\n投资建议：{}\n\n风险提示：以上内容仅供参考，投资有风险，入市需谨慎。",
+            "基于对{}股票的综合技术分析报告：
+
+【基本信息】
+股票代码：{}
+当前股价：{:.2}元
+涨跌幅：{:.2}%
+成交量状态：{}
+波动率：{:.2}%
+
+【技术分析】
+- 移动平均线：5日均线{:.2}，10日均线{:.2}，20日均线{:.2}，60日均线{:.2}
+- 趋势分析：{}，{}
+- RSI指标：{:.2}（{}）
+- MACD信号：{}，MACD线：{:.3}
+- 布林带位置：{:.2}，上轨{:.2}，中轨{:.2}，下轨{:.2}
+- 威廉指标：{:.2}
+- 随机指标：K值{:.2}，D值{:.2}
+- 平均真实范围：{:.2}
+
+【基本面分析】
+- 市盈率：{:.2}倍
+- 市净率：{:.2}倍
+- 行业分类：{}
+- 板块分类：{}
+- 财务健康评分：{:.1}分
+- 盈利能力评分：{:.1}分
+- 流动性评分：{:.1}分
+- 偿债能力评分：{:.1}分
+
+【市场情绪】
+- 整体情绪：{:.2}（{}）
+- 情绪趋势：{}
+- 置信度：{:.2}
+- 分析新闻数量：{}条
+
+【综合评分】
+- 技术面评分：{:.1}分
+- 基本面评分：{:.1}分
+- 情绪面评分：{:.1}分
+- 综合评分：{:.1}分
+
+【投资建议】
+推荐等级：{}
+建议理由：基于技术面{}、基本面{}和市场情绪{}的综合评估，当前适合{}
+
+【风险提示】
+1. 技术指标仅供参考，不构成投资建议
+2. 基本面数据可能存在滞后性
+3. 市场情绪变化迅速，需密切关注
+4. 投资有风险，入市需谨慎
+5. 建议结合多方面信息进行投资决策
+
+【分析师观点】
+该股票目前技术面显示{}，基本面表现{}，市场情绪{}。投资者应密切关注{}的变化，并控制投资风险。
+
+*注：本分析基于历史数据和公开信息，不作为投资建议*",
             report.stock_name,
+            report.stock_code,
             report.price_info.current_price,
             report.price_info.price_change,
-            report.technical.rsi,
-            if report.technical.rsi > 70.0 { "超买" } else if report.technical.rsi < 30.0 { "超卖" } else { "正常" },
-            report.technical.macd_signal,
+            report.technical.volume_status,
+            report.price_info.volatility,
+            report.technical.ma5,
+            report.technical.ma10,
+            report.technical.ma20,
+            report.technical.ma60,
             report.technical.ma_trend,
+            trend_strength,
+            report.technical.rsi,
+            rsi_status,
+            report.technical.macd_signal,
+            report.technical.macd_line,
+            report.technical.bb_position,
+            report.technical.bb_upper,
+            report.technical.bb_middle,
+            report.technical.bb_lower,
+            report.technical.williams_r,
+            report.technical.stochastic_k,
+            report.technical.stochastic_d,
+            report.technical.atr,
             report.fundamental.valuation.get("pe_ratio").unwrap_or(&0.0),
             report.fundamental.valuation.get("pb_ratio").unwrap_or(&0.0),
             report.fundamental.industry,
+            report.fundamental.sector,
+            report.fundamental.financial_health.overall_health_score,
+            report.fundamental.financial_health.profitability_score,
+            report.fundamental.financial_health.liquidity_score,
+            report.fundamental.financial_health.solvency_score,
             report.sentiment.overall_sentiment,
             report.sentiment.sentiment_trend,
-            report.recommendation
+            report.sentiment.overall_sentiment,
+            report.sentiment.confidence_score,
+            report.sentiment.total_analyzed,
+            report.scores.technical,
+            report.scores.fundamental,
+            report.scores.sentiment,
+            report.scores.comprehensive,
+            report.recommendation,
+            if report.scores.technical > 60.0 { "相对强势" } else if report.scores.technical < 40.0 { "相对弱势" } else { "中性" },
+            if report.scores.fundamental > 60.0 { "良好" } else if report.scores.fundamental < 40.0 { "较差" } else { "一般" },
+            if report.scores.sentiment > 60.0 { "积极" } else if report.scores.sentiment < 40.0 { "消极" } else { "中性" },
+            if report.scores.comprehensive > 60.0 { "适度参与" } else if report.scores.comprehensive < 40.0 { "谨慎观望" } else { "保持关注" },
+            if report.scores.technical > 60.0 { "处于上升趋势" } else if report.scores.technical < 40.0 { "处于下降趋势" } else { "处于盘整阶段" },
+            if report.scores.fundamental > 60.0 { "较好" } else if report.scores.fundamental < 40.0 { "较差" } else { "一般" },
+            if report.scores.sentiment > 60.0 { "较为积极" } else if report.scores.sentiment < 40.0 { "较为消极" } else { "相对中性" },
+            if report.technical.adx > 25.0 { "趋势强度" } else { "价格走势" }
         )
     }
 

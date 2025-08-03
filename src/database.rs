@@ -1,4 +1,4 @@
-use sqlx::{Pool, Sqlite, Postgres, postgres::PgPoolOptions, sqlite::SqlitePoolOptions};
+use sqlx::{Pool, Sqlite, Postgres, postgres::PgPoolOptions, sqlite::SqlitePoolOptions, Row};
 use chrono::Utc;
 use uuid::Uuid;
 
@@ -182,7 +182,92 @@ impl Database {
     }
 
     pub async fn create_tables(&self) -> Result<(), sqlx::Error> {
-        // Tables are created by the PostgreSQL init script, so we don't need to create them here
+        match self {
+            Database::Sqlite(pool) => {
+                // Create tables for SQLite
+                sqlx::query(
+                    r#"
+                    CREATE TABLE IF NOT EXISTS saved_analyses (
+                        id TEXT PRIMARY KEY,
+                        stock_code TEXT NOT NULL,
+                        stock_name TEXT NOT NULL,
+                        analysis_date TEXT NOT NULL,
+                        price_info TEXT NOT NULL,
+                        technical TEXT NOT NULL,
+                        fundamental TEXT NOT NULL,
+                        sentiment TEXT NOT NULL,
+                        scores TEXT NOT NULL,
+                        recommendation TEXT NOT NULL,
+                        ai_analysis TEXT,
+                        data_quality TEXT NOT NULL,
+                        ai_provider TEXT,
+                        ai_model TEXT,
+                        created_at TEXT NOT NULL
+                    )
+                    "#
+                )
+                .execute(pool)
+                .await?;
+                
+                sqlx::query(
+                    r#"
+                    CREATE TABLE IF NOT EXISTS saved_configurations (
+                        id TEXT PRIMARY KEY,
+                        config_type TEXT NOT NULL,
+                        config_name TEXT NOT NULL,
+                        config_data TEXT NOT NULL,
+                        is_active INTEGER DEFAULT 0,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                    "#
+                )
+                .execute(pool)
+                .await?;
+            }
+            Database::Postgres(pool) => {
+                // For PostgreSQL, tables should be created by init script
+                // But let's verify they exist and create them if needed
+                let table_exists = sqlx::query(
+                    "SELECT EXISTS (
+                        SELECT FROM information_schema.tables 
+                        WHERE table_schema = 'public' 
+                        AND table_name = 'saved_analyses'
+                    )"
+                )
+                .fetch_one(pool)
+                .await?;
+                
+                let exists: bool = table_exists.get("exists");
+                if !exists {
+                    log::warn!("saved_analyses table does not exist, attempting to create it");
+                    // Try to create the table
+                    sqlx::query(
+                        r#"
+                        CREATE TABLE saved_analyses (
+                            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                            stock_code VARCHAR(20) NOT NULL,
+                            stock_name VARCHAR(100) NOT NULL,
+                            analysis_date TIMESTAMP WITH TIME ZONE NOT NULL,
+                            price_info JSONB NOT NULL,
+                            technical JSONB NOT NULL,
+                            fundamental JSONB NOT NULL,
+                            sentiment JSONB NOT NULL,
+                            scores JSONB NOT NULL,
+                            recommendation VARCHAR(50) NOT NULL,
+                            ai_analysis TEXT,
+                            data_quality JSONB NOT NULL,
+                            ai_provider VARCHAR(50),
+                            ai_model VARCHAR(50),
+                            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                        )
+                        "#
+                    )
+                    .execute(pool)
+                    .await?;
+                }
+            }
+        }
         Ok(())
     }
 }
