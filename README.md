@@ -1,415 +1,484 @@
-# 🚀 AI增强股票分析系统 (Enhanced AI Stock Analysis System)
+# Rust 股票分析器
 
-## 📋 项目简介
+基于 Rust 的高性能股票分析系统，集成多种 AI 服务提供商，支持单股和批量分析，提供专业的投资建议。
 
-这是一个比较专业的AI增强 A股股票分析系统，集成了**25项财务指标分析**、**综合新闻情绪分析**、**技术指标计算**和**AI深度解读**。系统支持多种AI模型（OpenAI GPT、Claude、智谱AI），提供桌面GUI和Web两种界面，具备实时流式推送功能。
-暂时只支持中国股票，港美股正在优化还未发布，港美股新闻信息等获取受限缓慢优化中。
+## 🚀 核心特性
 
-## 💰 请我喝奶茶
+### 🎯 智能分析
+- **多维度评分**: 技术面 (50%)、基本面 (30%)、情绪面 (20%)
+- **AI 智能分析**: 集成 9 大 AI 服务提供商
+- **实时数据处理**: WebSocket 实时更新分析进度
+- **专业报告**: 生成详细的股票分析报告
 
-如果这个项目对您有帮助，欢迎支持：
-🔗 [https://juanzen.linzefeng.top/](https://juanzen.linzefeng.top/)
-## demo网站小日志
-#### ~~最近家里云openwrt不堪重负的逝去了，择日恢复demo站点。(大家不要学我all in one，那么就会变成all in boom）~~
-#### 更换cdn到国内节点
-#### 已经恢复demo站点，使用deepseek-ai/DeepSeek-R1-0528-Qwen3-8B模型分析。版本为2.6webapp（3.1出现大量bug，回退）。
-## 近期开发日志
-- docker编译支持一键部署 x86及arm 64
-- 港美股支持
-- 其他慢慢想和学习一些策略。
-## ✨ 核心特性
+### 🤖 AI 服务集成
+- **OpenAI**: GPT-4o、GPT-4o-mini、GPT-3.5-turbo
+- **Claude**: Claude 3.5 Sonnet、Claude 3 Haiku
+- **百度文心**: ERNIE-Bot-4、ERNIE-Bot-turbo
+- **腾讯混元**: Hunyuan-pro、Hunyuan-standard
+- **智谱 GLM**: GLM-4、GLM-4-air、GLM-3-turbo
+- **阿里通义**: Qwen-turbo、Qwen-plus、Qwen-max
+- **月之暗面**: Moonshot-v1-8k、Moonshot-v1-32k、Moonshot-v1-128k
+- **Ollama**: Llama3.1、Qwen2.5、Mistral-nemo
+- **自定义模型**: 支持用户自定义 AI 模型
 
-### 🎯 多维度分析
-- **25项核心财务指标**：盈利能力、偿债能力、营运能力、发展能力、市场表现
-- **技术面分析**：移动平均线、RSI、MACD、布林带、成交量分析
-- **市场情绪分析**：新闻、公告、研报情绪挖掘，支持100+条新闻分析
-- **AI智能解读**：多模型深度分析，提供专业投资建议
+### 📊 数据分析维度
+- **技术分析**: 移动平均线、RSI、MACD、布林带等 25+ 技术指标
+- **基本面分析**: 财务指标、估值分析、行业对比
+- **情绪分析**: 新闻情感分析、市场关注度、舆情监控
+- **智能建议**: 基于多维度数据的专业投资建议
 
-### 🤖 AI能力支持
-- **多模型兼容**：OpenAI GPT-4、Claude-3、智谱AI ChatGLM
-- **智能切换**：主备API自动切换，确保服务可用性
-- **流式推理**：实时AI分析过程展示，支持Server-Sent Events
-- **高级规则**：AI不可用时自动降级到高级规则分析
+### 💾 数据持久化
+- **SQLite**: 默认嵌入式数据库，无需额外配置
+- **PostgreSQL**: 生产级数据库支持
+- **自动迁移**: 数据库表结构自动创建和更新
+- **历史记录**: 完整的分析历史和配置管理
 
-### 🌐 多端支持
-- **桌面版GUI**：基于PyQt6的现代化界面，支持实时日志和进度显示
-- **Web版本**：Flask + SSE，支持多用户并发，实时流式推送
-- **批量分析**：支持多股票并发分析，线程池优化
-- **Docker部署**：容器化部署，支持一键启动
+## 🛠️ 快速开始
 
-### 🔐 企业级特性
-- **密码鉴权**：Web版支持密码保护和会话管理
-- **高并发**：线程池 + 异步处理 + 任务队列优化
-- **缓存机制**：智能数据缓存，减少API调用
-- **错误处理**：完善的异常处理和重试机制
+### 环境要求
+- Rust 1.70+
+- PostgreSQL (可选，用于生产环境)
+- Python 3.8+ (可选，用于 AKShare 服务)
 
-## 🏗️ 系统架构
-
-```
-📦 AI股票分析系统
-├── 🖥️ 桌面版 (2.0 win app/)
-│   ├── gui2.py                    # 现代化GUI界面
-│   ├── stock_analyzer.py          # 核心分析引擎
-│   ├── 配置文件编辑器.py            # 可视化配置管理
-│   └── config.json                # 系统配置文件
-├── 🌐 Web版 (2.6 webapp/)
-│   ├── flask_web_server.py        # Flask服务器(SSE支持)
-│   ├── web_stock_analyzer.py      # Web优化分析器
-│   ├── Dockerfile                 # Docker容器配置
-│   └── docker-compose.yaml        # 容器编排配置
-└── 📚 文档
-    └── README.md                   # 项目文档
-```
-
-## 🚀 快速开始
-
-### 1. 环境准备
-
+### 1. 克隆项目
 ```bash
-# 克隆项目
-git clone https://github.com/DR-lin-eng/stock-scanner.git
-cd stock-analysis-system
-
-# 安装依赖
-pip install -r requirements.txt
+git clone https://github.com/WangsYi/rust-stock-scanner.git
+cd rust-stock-analyzer
 ```
 
-### 2. 配置系统
+### 2. 构建项目
+```bash
+# 开发模式构建
+cargo build
 
-创建 `config.json` 文件（参考 `config - 示例.json`）：
+# 生产模式构建
+cargo build --release
+```
 
+### 3. 配置环境
+```bash
+# 复制环境变量模板
+cp .env.example .env
+
+# 编辑配置文件
+nano .env
+```
+
+### 4. 启动应用
+```bash
+# 开发模式运行
+cargo run
+
+# 生产模式运行
+cargo run --release
+
+# 使用自定义配置
+cargo run --release -- --config config.json
+```
+
+### 5. 访问应用
+- **主页**: http://localhost:8080
+- **批量分析**: http://localhost:8080/batch
+- **配置管理**: http://localhost:8080/config
+- **健康检查**: http://localhost:8080/api/health
+
+## 🔧 配置说明
+
+### 环境变量配置
+```bash
+# 服务器配置
+HOST=0.0.0.0
+PORT=8080
+WORKERS=4
+RUST_LOG=info
+
+# 数据库配置
+DATABASE_URL=sqlite:stock_analyzer.db
+DATABASE_MAX_CONNECTIONS=5
+DATABASE_ENABLE_MIGRATIONS=true
+
+# AI 服务配置
+AI_PROVIDER=openai
+AI_API_KEY=your-api-key-here
+AI_MODEL=gpt-4o
+AI_ENABLED=true
+AI_TIMEOUT=30
+
+# 分析参数配置
+MAX_WORKERS=10
+TIMEOUT_SECONDS=30
+TECHNICAL_WEIGHT=0.5
+FUNDAMENTAL_WEIGHT=0.3
+SENTIMENT_WEIGHT=0.2
+TECHNICAL_PERIOD=60
+SENTIMENT_PERIOD=30
+
+# AKShare 服务配置
+AKSERVICE_URL=http://localhost:5000
+AKSERVICE_TIMEOUT=30
+
+# 认证配置 (可选)
+AUTH_ENABLED=false
+AUTH_SECRET_KEY=your-secret-key
+SESSION_TIMEOUT=86400
+```
+
+### 配置文件示例
 ```json
 {
-    "api_keys": {
-        "openai": "sk-your-openai-key",
-        "anthropic": "sk-ant-your-claude-key",
-        "zhipu": "your-zhipu-key"
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8080,
+    "workers": 4
+  },
+  "analysis": {
+    "max_workers": 10,
+    "timeout_seconds": 30,
+    "weights": {
+      "technical": 0.5,
+      "fundamental": 0.3,
+      "sentiment": 0.2
     },
-    "ai": {
-        "model_preference": "openai",
-        "models": {
-            "openai": "gpt-4o-mini",
-            "anthropic": "claude-3-haiku-20240307"
-        }
-    },
-    "web_auth": {
-        "enabled": true,
-        "password": "your_password",
-        "session_timeout": 3600
+    "parameters": {
+      "technical_period_days": 60,
+      "sentiment_period_days": 30
     }
+  },
+  "ai": {
+    "provider": "openai",
+    "model": "gpt-4o",
+    "enabled": true,
+    "timeout": 30
+  },
+  "database": {
+    "url": "sqlite:stock_analyzer.db",
+    "max_connections": 5,
+    "enable_migrations": true
+  }
 }
 ```
 
-### 3. 运行系统
+## 📡 API 接口
 
-#### 🖥️ 桌面版GUI
+### 分析接口
 ```bash
-cd "2.0 win app"
-python gui2.py
-```
+# 单股分析
+POST /api/analyze
+Content-Type: application/json
 
-#### 🌐 Web版本
-```bash
-cd "2.6 webapp（流式传输测试版）"
-python flask_web_server.py
-# 访问 http://localhost:5000
-```
-
-#### 🐳 Docker部署
-```bash
-cd "2.6 webapp（流式传输测试版）"
-docker-compose up -d
-```
-
-## 📊 功能详解
-
-### 财务指标分析（25项）
-
-| 类别 | 指标 | 说明 |
-|------|------|------|
-| 盈利能力 | 净利润率、净资产收益率、总资产收益率 | 评估公司盈利水平 |
-| 偿债能力 | 流动比率、资产负债率、利息保障倍数 | 评估财务风险 |
-| 营运能力 | 总资产周转率、存货周转率 | 评估运营效率 |
-| 发展能力 | 营收增长率、净利润增长率 | 评估成长性 |
-| 市场表现 | 市盈率、市净率、PEG比率 | 评估估值水平 |
-
-### 技术指标体系
-- **趋势指标**：多周期移动平均线、MACD金叉死叉
-- **震荡指标**：RSI超买超卖、布林带位置
-- **成交量**：量价配合分析、成交量比率
-- **综合评分**：多指标权重计算，0-100分评级
-
-### AI分析能力
-- **智能解读**：基于25项指标的专业分析
-- **投资策略**：明确的买卖建议和操作策略
-- **风险评估**：潜在风险和机会识别
-- **行业对比**：同行业估值和财务对比
-
-## 🔧 API接口文档
-
-### Web版API接口
-
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `/api/status` | GET | 系统状态检查 |
-| `/api/sse` | GET | SSE流式接口 |
-| `/api/analyze_stream` | POST | 单股票流式分析 |
-| `/api/batch_analyze_stream` | POST | 批量流式分析 |
-| `/api/system_info` | GET | 系统信息 |
-
-### SSE事件类型
-- `connected`: 连接确认
-- `log`: 日志消息  
-- `progress`: 进度更新
-- `scores_update`: 评分更新
-- `final_result`: 最终结果
-- `ai_stream`: AI流式内容
-
-## 🎨 界面展示
-
-### 桌面版GUI
-- 现代化Material Design风格
-- 实时日志和进度显示
-- 动态评分卡片和数据指标
-- 支持单股票和批量分析
-
-### Web版界面  
-- 响应式设计，支持移动端
-- SSE实时流式推送
-- 动态结果更新
-- 密码鉴权保护
-
-## ⚙️ 配置选项
-
-### 核心配置
-```json
 {
-    "analysis_weights": {
-        "technical": 0.4,    // 技术面权重
-        "fundamental": 0.4,  // 基本面权重  
-        "sentiment": 0.2     // 情绪面权重
-    },
-    "analysis_params": {
-        "max_news_count": 100,           // 最大新闻数量
-        "technical_period_days": 365,    // 技术分析周期
-        "financial_indicators_count": 25  // 财务指标数量
-    },
-    "cache": {
-        "price_hours": 1,      // 价格数据缓存时间
-        "fundamental_hours": 6, // 基本面缓存时间
-        "news_hours": 2        // 新闻数据缓存时间
-    }
+  "stock_code": "000001",
+  "enable_ai": true,
+  "ai_provider": "openai",
+  "ai_model": "gpt-4o"
 }
-```
-
-## 🔍 使用示例
-
-### 单股票分析
-```python
-from stock_analyzer import EnhancedStockAnalyzer
-
-# 初始化分析器
-analyzer = EnhancedStockAnalyzer()
-
-# 分析股票
-report = analyzer.analyze_stock('000001')
-
-print(f"股票名称: {report['stock_name']}")
-print(f"综合得分: {report['scores']['comprehensive']:.1f}")
-print(f"投资建议: {report['recommendation']}")
-```
-
-### Web API调用
-```bash
-# 单股票分析
-curl -X POST http://localhost:5000/api/analyze_stream \
-  -H "Content-Type: application/json" \
-  -d '{"stock_code": "000001", "client_id": "test_client"}'
 
 # 批量分析
-curl -X POST http://localhost:5000/api/batch_analyze_stream \
-  -H "Content-Type: application/json" \
-  -d '{"stock_codes": ["000001", "000002"], "client_id": "test_client"}'
+POST /api/batch/analyze
+Content-Type: application/json
+
+{
+  "stock_codes": ["000001", "600036", "300019"],
+  "enable_ai": true
+}
+
+# 获取批量分析进度
+GET /api/batch/status/{task_id}
 ```
 
-## 📈 性能优化
+### 数据接口
+```bash
+# 获取股票价格数据
+GET /api/stock/{code}/price?days=30
 
-### 高并发特性
-- **线程池**：支持4个工作线程并发处理
-- **异步分析**：非阻塞任务处理
-- **连接复用**：SSE连接池管理
-- **智能缓存**：多级缓存减少API调用
+# 获取基本面数据
+GET /api/stock/{code}/fundamental
 
-### 数据优化
-- **NaN值清理**：确保JSON序列化兼容
-- **批量处理**：并发获取多股票数据
-- **增量更新**：支持部分结果推送
+# 获取新闻情绪数据
+GET /api/stock/{code}/news?days=15
 
-## 🛡️ 安全特性
+# 获取股票名称
+GET /api/stock/{code}/name
+```
 
-### Web端安全
-- **密码鉴权**：支持自定义密码保护
-- **会话管理**：可配置会话超时时间
-- **CSRF防护**：跨站请求伪造防护
-- **输入验证**：严格的参数校验
+### 配置管理接口
+```bash
+# 获取 AI 配置
+GET /api/config/ai
 
-### 数据安全
-- **API密钥保护**：本地加密存储
-- **错误处理**：不泄露敏感信息
-- **访问控制**：基于会话的权限控制
+# 更新 AI 配置
+POST /api/config/ai
 
-## 🔧 故障排除
+# 获取可用的 AI 提供商
+GET /api/config/ai/providers
+
+# 测试 AI 连接
+POST /api/config/ai/test
+```
+
+### 历史记录接口
+```bash
+# 获取分析历史
+GET /api/history?stock_code=000001&limit=10
+
+# 获取特定分析结果
+GET /api/history/{id}
+
+# 保存配置
+POST /api/configurations
+
+# 获取保存的配置
+GET /api/configurations
+```
+
+## 🐳 Docker 部署
+
+### 快速启动
+```bash
+# 启动所有服务
+docker-compose --profile proxy up -d
+
+# 仅启动核心服务
+docker-compose up -d
+
+# 开发环境
+docker-compose -f docker-compose.dev.yml up -d
+```
+
+### 环境配置
+```bash
+# 复制环境变量
+cp .env.example .env
+
+# 编辑配置
+nano .env
+```
+
+## 🎮 使用指南
+
+### 单股分析
+1. 访问 http://localhost:8080
+2. 输入股票代码（如：000001）
+3. 选择 AI 提供商和模型
+4. 点击"开始分析"
+5. 查看详细的分析报告
+
+### 批量分析
+1. 访问 http://localhost:8080/batch
+2. 输入多个股票代码（每行一个）
+3. 配置分析参数
+4. 点击"开始批量分析"
+5. 实时查看分析进度
+6. 完成后查看所有结果
+
+### 配置管理
+1. 访问 http://localhost:8080/config
+2. 配置 AI 服务提供商
+3. 设置 API 密钥
+4. 选择默认模型
+5. 保存配置
+
+## 🏗️ 项目架构
+
+### 核心模块
+```
+src/
+├── main.rs              # 应用入口和 HTTP 服务器
+├── models.rs            # 数据模型定义
+├── handlers.rs          # HTTP 请求处理
+├── analyzer.rs          # 核心分析引擎
+├── data_fetcher.rs      # 数据获取抽象层
+├── ai_service.rs        # AI 服务集成
+├── auth.rs              # 认证和用户管理
+└── database.rs          # 数据库集成
+```
+
+### 前端界面
+```
+templates/
+├── index.html           # 单股分析界面
+├── batch.html           # 批量分析界面
+└── config.html          # 配置管理界面
+```
+
+### 配置文件
+```
+├── .env.example         # 环境变量模板
+├── config.json          # 应用配置
+├── Cargo.toml           # Rust 依赖配置
+└── CLAUDE.md            # 开发指南
+```
+
+## 🔧 开发指南
+
+### 添加新的 AI 提供商
+1. 在 `ai_service.rs` 中实现新的提供者逻辑
+2. 更新 `get_ai_providers_info()` 函数
+3. 添加相应的配置选项
+4. 测试集成功能
+
+### 添加新的分析指标
+1. 在 `models.rs` 中定义新的数据结构
+2. 在 `analyzer.rs` 中实现分析逻辑
+3. 更新评分算法
+4. 添加相应的测试
+
+### 数据库操作
+```bash
+# 运行数据库迁移
+./setup_database.sh
+
+# 使用 SQLite（默认）
+cargo run
+
+# 使用 PostgreSQL
+DATABASE_URL=postgres://user@localhost:5432/stock_analyzer cargo run
+```
+
+## 🧪 测试
+
+### 运行测试
+```bash
+# 运行所有测试
+cargo test
+
+# 运行特定测试
+cargo test analyzer::tests::test_scoring
+
+# 运行集成测试
+cargo test integration::tests::test_full_analysis
+```
+
+### 性能测试
+```bash
+# 运行基准测试
+cargo bench
+
+# 性能分析
+cargo build --release
+perf record --call-graph dwarf ./target/release/rust-stock-analyzer
+```
+
+## 🔍 故障排除
 
 ### 常见问题
 
-1. **数据获取失败**
+1. **端口占用**
    ```bash
-   # 检查网络连接
-   ping quote.eastmoney.com
-   
-   # 检查akshare版本
-   pip install --upgrade akshare
+   # 查找占用进程
+   lsof -i :8080
+   # 或修改端口
+   PORT=8081 cargo run
    ```
 
-2. **AI分析失败**
+2. **AI 服务连接失败**
+   - 检查 API 密钥是否正确
+   - 验证网络连接
+   - 查看 AI 服务状态
+
+3. **数据库连接失败**
    ```bash
-   # 检查API密钥配置
-   python -c "import json; print(json.load(open('config.json'))['api_keys'])"
+   # SQLite: 检查文件权限
+   chmod 644 stock_analyzer.db
    
-   # 测试API连接
-   curl -H "Authorization: Bearer YOUR_API_KEY" https://api.openai.com/v1/models
+   # PostgreSQL: 检查服务状态
+   systemctl status postgresql
    ```
 
-3. **Web版访问问题**
-   ```bash
-   # 检查端口占用
-   netstat -tulpn | grep :5000
-   
-   # 查看服务日志
-   python flask_web_server.py
-   ```
+4. **AKShare 服务未启动**
+   - 使用 mock 数据运行
+   - 或启动 Python 服务：`python3 akshare_service.py`
 
-## 📦 部署指南
-
-### 开发环境
+### 调试模式
 ```bash
-# 安装开发依赖
-pip install -r requirements.txt
+# 启用调试日志
+RUST_LOG=debug cargo run
 
-# 启动开发服务器
-python flask_web_server.py
+# 记录特定模块日志
+RUST_LOG=analyzer=debug,ai_service=debug cargo run
 ```
 
-### 生产环境
+## 📊 性能优化
+
+### 系统优化
+- **并发处理**: 使用 Tokio 异步运行时
+- **连接池**: 复用 HTTP 连接和数据库连接
+- **缓存策略**: 实现智能缓存机制
+- **资源管理**: 合理分配系统资源
+
+### 配置优化
 ```bash
-# 使用Gunicorn部署
-pip install gunicorn
-gunicorn -w 4 -b 0.0.0.0:5000 flask_web_server:app
-
-# 或使用Docker
-docker-compose up -d
+# 生产环境配置
+RUST_LOG=warn
+MAX_WORKERS=20
+DATABASE_MAX_CONNECTIONS=20
+CACHE_ENABLED=true
 ```
 
-### 反向代理参考(Nginx)
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-    
-    location / {
-        proxy_pass http://localhost:5000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-    
-    location /api/sse {
-        proxy_pass http://localhost:5000;
-        proxy_set_header Connection '';
-        proxy_http_version 1.1;
-        proxy_buffering off;
-        proxy_cache off;
-        chunked_transfer_encoding off;
-    }
-}
-```
+## 🚀 部署指南
 
-## 📊 版本历史
+### 生产环境部署
+1. **构建优化版本**
+   ```bash
+   cargo build --release
+   ```
 
-### v3.0 (2024-12) - AI增强版
-- ✨ 集成多AI模型支持
-- 🌊 新增SSE流式推送
-- 🔐 增加Web端密码鉴权
-- 🚀 高并发性能优化
+2. **配置生产环境**
+   ```bash
+   # 设置环境变量
+   export RUST_LOG=warn
+   export DATABASE_URL=postgres://user@localhost:5432/stock_analyzer
+   export MAX_WORKERS=20
+   ```
 
-### v2.0 (2024-11) - 增强版  
-- 📊 新增25项财务指标分析
-- 📰 增加综合新闻情绪分析
-- 🎨 现代化GUI界面
-- ⚙️ 可视化配置管理器
+3. **使用 Docker 部署**
+   ```bash
+   docker-compose --profile proxy up -d
+   ```
 
-### v1.0 (2024-10) - 基础版
-- 📈 基础技术指标分析
-- 🖥️ 简单GUI界面
-- 📋 单股票分析功能
+4. **服务管理**
+   ```bash
+   # 使用 systemd 管理服务
+   sudo systemctl enable rust-stock-analyzer
+   sudo systemctl start rust-stock-analyzer
+   ```
+
+## 📝 更新日志
+
+### v2.0.0 (当前版本)
+- ✅ 集成 9 大 AI 服务提供商
+- ✅ 添加数据库持久化支持
+- ✅ 实现配置管理系统
+- ✅ 优化性能和稳定性
+- ✅ 完善 Docker 部署方案
+
+### v1.0.0
+- ✅ 基础股票分析功能
+- ✅ 批量分析支持
+- ✅ WebSocket 实时更新
+- ✅ 响应式 Web 界面
 
 ## 🤝 贡献指南
 
-欢迎提交Issues和Pull Requests！
-
-### 开发流程
-1. Fork 项目
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交改动 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送分支 (`git push origin feature/AmazingFeature`)
-5. 打开 Pull Request
+1. Fork 本项目
+2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 创建 Pull Request
 
 ## 📄 许可证
 
-MIT License - 详见 [LICENSE](LICENSE) 文件
+本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
 
-Copyright (c) 2024 [linzefeng]
+## 🙏 致谢
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+- [AKShare](https://github.com/akfamily/akshare) - 开源金融数据接口库
+- [Actix Web](https://actix.rs/) - 高性能 Rust Web 框架
+- [Tokio](https://tokio.rs/) - Rust 异步运行时
+- 所有 AI 服务提供商的支持
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+## 📞 联系方式
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-## ⚠️ 免责声明
-
-**本系统仅用于学习和研究目的，所有分析结果仅供参考，不构成投资建议。投资有风险，入市需谨慎。**
-
-
-
-## 💖 特别鸣谢
-[Pollinations AI](https://auth.pollinations.ai/) 为提供llm生成服务
-![NodeSupport](https://github.com/user-attachments/assets/843f88fc-ecf7-4993-93c4-f82a29078e28)
-
-[yxvm](https://yxvm.com/) | [NodeSupport](https://github.com/NodeSeekDev/NodeSupport) 赞助了本项目
-
-## 👨‍💻 作者
-
-Created by [linzefeng]
-
----
-
-<div align="center">
-
-**如果这个项目对您有帮助，请给个 ⭐ Star 支持一下！**
-
-[📧 Issue反馈](../../issues) | [🚀 功能建议](../../discussions) | [📖 更多文档](../../wiki) | ![Docker Image](https://ghcr-badge.deta.dev/dr-lin-eng/stock-scanner/stock-webapp/latest_tag?trim=major\&label=最新版本)
-
-
-</div>
+- 项目地址: [https://github.com/WangsYi/rust-stock-scanner](https://github.com/WangsYi/rust-stock-scanner)
+- 问题反馈: [GitHub Issues](https://github.com/WangsYi/rust-stock-scanner/issues)
+- 邮箱: [your-email@example.com](mailto:your-email@example.com)
