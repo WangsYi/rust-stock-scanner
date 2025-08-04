@@ -2,11 +2,11 @@ use chrono::Utc;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::models::*;
-use crate::models::Market;
-use crate::data_fetcher::DataFetcher;
 use crate::ai_service::AIService;
+use crate::data_fetcher::DataFetcher;
 use crate::database::Database;
+use crate::models::Market;
+use crate::models::*;
 
 pub struct StockAnalyzer {
     data_fetcher: Box<dyn DataFetcher>,
@@ -47,25 +47,29 @@ impl StockAnalyzer {
         self.data_fetcher.as_ref()
     }
 
-    pub async fn analyze_single_stock(&self, stock_code: &str, enable_ai: bool) -> Result<AnalysisReport, String> {
+    pub async fn analyze_single_stock(
+        &self,
+        stock_code: &str,
+        enable_ai: bool,
+    ) -> Result<AnalysisReport, String> {
         let market = Market::from_stock_code(stock_code);
-        let stock_name = self.data_fetcher.get_stock_name(stock_code).await;
-        
-        let price_data = self.data_fetcher.get_stock_data(stock_code, self.config.parameters.technical_period_days).await?;
-        let fundamental_data = self.data_fetcher.get_fundamental_data(stock_code).await?;
-        let (news_data, sentiment_data) = self.data_fetcher.get_news_data(stock_code, self.config.parameters.sentiment_period_days).await?;
+
+        // Use concurrent data fetching for better performance
+        let (price_data, fundamental_data, (news_data, sentiment_data), stock_name) = self
+            .data_fetcher
+            .get_all_data_concurrent(stock_code, self.config.parameters.technical_period_days)
+            .await?;
 
         let technical = self.calculate_technical_analysis(&price_data);
         let price_info = self.calculate_price_info(&price_data);
-        
+
         let technical_score = self.calculate_technical_score(&technical, &price_data);
         let fundamental_score = self.calculate_fundamental_score(&fundamental_data, &market);
         let sentiment_score = self.calculate_sentiment_score(&sentiment_data);
 
-        let comprehensive_score = 
-            technical_score * self.config.weights.technical +
-            fundamental_score * self.config.weights.fundamental +
-            sentiment_score * self.config.weights.sentiment;
+        let comprehensive_score = technical_score * self.config.weights.technical
+            + fundamental_score * self.config.weights.fundamental
+            + sentiment_score * self.config.weights.sentiment;
 
         let scores = AnalysisScores {
             technical: technical_score,
@@ -75,8 +79,8 @@ impl StockAnalyzer {
         };
 
         let recommendation = self.generate_recommendation(&scores, &technical);
-        
-          let ai_analysis = if enable_ai {
+
+        let (ai_analysis, fallback_used, fallback_reason) = if enable_ai {
             let ai_service = self.ai_service.read().await;
             let report_for_ai = AnalysisReport {
                 stock_code: stock_code.to_string(),
@@ -95,18 +99,26 @@ impl StockAnalyzer {
                     total_news_count: news_data.len() as i32,
                     analysis_completeness: "完整".to_string(),
                 },
+                fallback_used: false,
+                fallback_reason: None,
             };
-            
+
             match ai_service.generate_analysis(&report_for_ai).await {
-                Ok(analysis) => analysis,
-                Err(_) => {
-                    // Use AI service's fallback analysis instead of analyzer's
-                    ai_service.generate_fallback_analysis(&report_for_ai)
+                Ok(analysis) => (analysis, false, None),
+                Err(err) => {
+                    log::error!("Failed to generate AI analysis: {}", err);
+                    let reason = format!("AI分析失败: {}", err);
+                    let mut fallback_report = report_for_ai.clone();
+                    fallback_report.fallback_used = true;
+                    fallback_report.fallback_reason = Some(reason.clone());
+                    let fallback_analysis = ai_service.generate_fallback_analysis(&fallback_report);
+                    (fallback_analysis, true, Some(reason))
                 }
             }
         } else {
             // Even when AI is disabled, use the detailed fallback analysis from AI service
             let ai_service = self.ai_service.read().await;
+            let reason = "AI分析已禁用，使用备用分析".to_string();
             let report_for_ai = AnalysisReport {
                 stock_code: stock_code.to_string(),
                 stock_name: stock_name.clone(),
@@ -124,8 +136,11 @@ impl StockAnalyzer {
                     total_news_count: news_data.len() as i32,
                     analysis_completeness: "完整".to_string(),
                 },
+                fallback_used: true,
+                fallback_reason: Some(reason.clone()),
             };
-            ai_service.generate_fallback_analysis(&report_for_ai)
+            let fallback_analysis = ai_service.generate_fallback_analysis(&report_for_ai);
+            (fallback_analysis, true, Some(reason))
         };
 
         let report = AnalysisReport {
@@ -145,6 +160,8 @@ impl StockAnalyzer {
                 total_news_count: news_data.len() as i32,
                 analysis_completeness: "完整".to_string(),
             },
+            fallback_used,
+            fallback_reason,
         };
 
         // Save analysis to database if available
@@ -153,7 +170,7 @@ impl StockAnalyzer {
             let ai_provider = Some(ai_service_guard.get_provider().to_string());
             let ai_model = Some(ai_service_guard.get_model().to_string());
             drop(ai_service_guard);
-            
+
             if let Err(e) = database.save_analysis(&report, ai_provider, ai_model).await {
                 log::warn!("Failed to save analysis to database: {}", e);
             }
@@ -227,26 +244,26 @@ impl StockAnalyzer {
             ma20,
             ma60,
             ma120,
-            
+
             // Momentum Indicators
             rsi,
             macd_signal,
             macd_line,
             macd_histogram,
-            
+
             // Volatility Indicators
             bb_position,
             bb_upper,
             bb_middle,
             bb_lower,
             atr,
-            
+
             // Additional Indicators
             williams_r,
             cci,
             stochastic_k,
             stochastic_d,
-            
+
             // Volume and Trend
             volume_status: volume_status.to_string(),
             ma_trend,
@@ -284,7 +301,6 @@ impl StockAnalyzer {
         100.0 - (100.0 / (1.0 + rs))
     }
 
-  
     fn calculate_std_dev(&self, data: &[f64], period: usize) -> f64 {
         if data.len() < period {
             return 1.0;
@@ -301,9 +317,9 @@ impl StockAnalyzer {
         let short_ma = self.calculate_ma(data, 12.min(data.len()));
         let long_ma = self.calculate_ma(data, 26.min(data.len()));
         let macd_line = short_ma - long_ma;
-        
+
         // Calculate signal line (9-period EMA of MACD line)
-        let signal_line = self.calculate_ema(&vec![macd_line], 9);
+        let signal_line = self.calculate_ema(&[macd_line], 9);
         let macd_histogram = macd_line - signal_line;
 
         let macd_signal = if macd_line > signal_line {
@@ -320,11 +336,11 @@ impl StockAnalyzer {
         let period = 20.min(data.len());
         let middle = self.calculate_ma(data, period);
         let std_dev = self.calculate_std_dev(data, period);
-        
+
         let upper = middle + 2.0 * std_dev;
         let lower = middle - 2.0 * std_dev;
         let current = *data.last().unwrap_or(&0.0);
-        
+
         let position = if upper - lower > 0.0 {
             (current - lower) / (upper - lower)
         } else {
@@ -345,11 +361,11 @@ impl StockAnalyzer {
             let high = highs[i];
             let low = lows[i];
             let prev_close = closes[i - 1];
-            
+
             let tr = high - low;
             let tr1 = (high - prev_close).abs();
             let tr2 = (low - prev_close).abs();
-            
+
             true_ranges.push(tr.max(tr1).max(tr2));
         }
 
@@ -358,13 +374,22 @@ impl StockAnalyzer {
     }
 
     // Williams %R calculation
-    fn calculate_williams_r(&self, highs: &[f64], lows: &[f64], closes: &[f64], period: usize) -> f64 {
+    fn calculate_williams_r(
+        &self,
+        highs: &[f64],
+        lows: &[f64],
+        closes: &[f64],
+        period: usize,
+    ) -> f64 {
         if highs.len() < period || lows.len() < period || closes.len() < period {
             return -50.0;
         }
 
         let highest = highs.iter().take(period).fold(0.0_f64, |a, &b| a.max(b));
-        let lowest = lows.iter().take(period).fold(f64::INFINITY, |a, &b| a.min(b));
+        let lowest = lows
+            .iter()
+            .take(period)
+            .fold(f64::INFINITY, |a, &b| a.min(b));
         let current = *closes.last().unwrap_or(&0.0);
 
         if highest - lowest > 0.0 {
@@ -401,7 +426,14 @@ impl StockAnalyzer {
     }
 
     // Stochastic Oscillator calculation
-    fn calculate_stochastic(&self, highs: &[f64], lows: &[f64], closes: &[f64], k_period: usize, d_period: usize) -> (f64, f64) {
+    fn calculate_stochastic(
+        &self,
+        highs: &[f64],
+        lows: &[f64],
+        closes: &[f64],
+        k_period: usize,
+        d_period: usize,
+    ) -> (f64, f64) {
         if highs.len() < k_period || lows.len() < k_period || closes.len() < k_period {
             return (50.0, 50.0);
         }
@@ -410,7 +442,9 @@ impl StockAnalyzer {
         for i in k_period - 1..closes.len() {
             let start_idx = i.saturating_sub(k_period - 1);
             let highest = highs[start_idx..=i].iter().fold(0.0_f64, |a, &b| a.max(b));
-            let lowest = lows[start_idx..=i].iter().fold(f64::INFINITY, |a, &b| a.min(b));
+            let lowest = lows[start_idx..=i]
+                .iter()
+                .fold(f64::INFINITY, |a, &b| a.min(b));
             let current = closes[i];
 
             if highest - lowest > 0.0 {
@@ -441,8 +475,16 @@ impl StockAnalyzer {
             let up_move = highs[i] - highs[i - 1];
             let down_move = lows[i - 1] - lows[i];
 
-            let plus_dm = if up_move > down_move && up_move > 0.0 { up_move } else { 0.0 };
-            let minus_dm = if down_move > up_move && down_move > 0.0 { down_move } else { 0.0 };
+            let plus_dm = if up_move > down_move && up_move > 0.0 {
+                up_move
+            } else {
+                0.0
+            };
+            let minus_dm = if down_move > up_move && down_move > 0.0 {
+                down_move
+            } else {
+                0.0
+            };
 
             plus_dms.push(plus_dm);
             minus_dms.push(minus_dm);
@@ -511,7 +553,8 @@ impl StockAnalyzer {
             0.0
         };
 
-        let recent_volumes: Vec<f64> = price_data.iter()
+        let recent_volumes: Vec<f64> = price_data
+            .iter()
             .rev()
             .take(5)
             .map(|p| p.volume as f64)
@@ -535,7 +578,11 @@ impl StockAnalyzer {
         }
     }
 
-    fn calculate_technical_score(&self, technical: &TechnicalAnalysis, _price_data: &[PriceData]) -> f64 {
+    fn calculate_technical_score(
+        &self,
+        technical: &TechnicalAnalysis,
+        _price_data: &[PriceData],
+    ) -> f64 {
         let mut score: f64 = 50.0;
 
         // RSI impact
@@ -628,7 +675,7 @@ impl StockAnalyzer {
                     } else if indicator.value < 5.0 {
                         score -= 8.0;
                     }
-                },
+                }
                 // Return indicators
                 "净资产收益率" | "ROE" | "Return on Equity" => {
                     if indicator.value > 15.0 {
@@ -638,70 +685,66 @@ impl StockAnalyzer {
                     } else if indicator.value < 8.0 {
                         score -= 8.0;
                     }
-                },
+                }
                 // Valuation ratios - market specific
-                "市盈率" | "P/E Ratio" | "PE Ratio" => {
-                    match market {
-                        Market::ASHARES => {
-                            if indicator.value > 0.0 && indicator.value < 20.0 {
-                                score += 8.0;
-                            } else if indicator.value > 50.0 {
-                                score -= 10.0;
-                            }
-                        },
-                        Market::US => {
-                            if indicator.value > 0.0 && indicator.value < 25.0 {
-                                score += 8.0;
-                            } else if indicator.value > 40.0 {
-                                score -= 8.0;
-                            }
-                        },
-                        Market::HONGKONG => {
-                            if indicator.value > 0.0 && indicator.value < 15.0 {
-                                score += 10.0;
-                            } else if indicator.value > 30.0 {
-                                score -= 10.0;
-                            }
-                        },
-                        Market::UNKNOWN => {
-                            if indicator.value > 0.0 && indicator.value < 20.0 {
-                                score += 6.0;
-                            } else if indicator.value > 50.0 {
-                                score -= 8.0;
-                            }
-                        },
+                "市盈率" | "P/E Ratio" | "PE Ratio" => match market {
+                    Market::ASHARES => {
+                        if indicator.value > 0.0 && indicator.value < 20.0 {
+                            score += 8.0;
+                        } else if indicator.value > 50.0 {
+                            score -= 10.0;
+                        }
+                    }
+                    Market::US => {
+                        if indicator.value > 0.0 && indicator.value < 25.0 {
+                            score += 8.0;
+                        } else if indicator.value > 40.0 {
+                            score -= 8.0;
+                        }
+                    }
+                    Market::HONGKONG => {
+                        if indicator.value > 0.0 && indicator.value < 15.0 {
+                            score += 10.0;
+                        } else if indicator.value > 30.0 {
+                            score -= 10.0;
+                        }
+                    }
+                    Market::UNKNOWN => {
+                        if indicator.value > 0.0 && indicator.value < 20.0 {
+                            score += 6.0;
+                        } else if indicator.value > 50.0 {
+                            score -= 8.0;
+                        }
                     }
                 },
-                "市净率" | "P/B Ratio" | "PB Ratio" => {
-                    match market {
-                        Market::ASHARES => {
-                            if indicator.value > 0.0 && indicator.value < 3.0 {
-                                score += 8.0;
-                            } else if indicator.value > 5.0 {
-                                score -= 8.0;
-                            }
-                        },
-                        Market::US => {
-                            if indicator.value > 0.0 && indicator.value < 4.0 {
-                                score += 6.0;
-                            } else if indicator.value > 8.0 {
-                                score -= 6.0;
-                            }
-                        },
-                        Market::HONGKONG => {
-                            if indicator.value > 0.0 && indicator.value < 2.5 {
-                                score += 10.0;
-                            } else if indicator.value > 4.0 {
-                                score -= 10.0;
-                            }
-                        },
-                        Market::UNKNOWN => {
-                            if indicator.value > 0.0 && indicator.value < 3.0 {
-                                score += 6.0;
-                            } else if indicator.value > 6.0 {
-                                score -= 6.0;
-                            }
-                        },
+                "市净率" | "P/B Ratio" | "PB Ratio" => match market {
+                    Market::ASHARES => {
+                        if indicator.value > 0.0 && indicator.value < 3.0 {
+                            score += 8.0;
+                        } else if indicator.value > 5.0 {
+                            score -= 8.0;
+                        }
+                    }
+                    Market::US => {
+                        if indicator.value > 0.0 && indicator.value < 4.0 {
+                            score += 6.0;
+                        } else if indicator.value > 8.0 {
+                            score -= 6.0;
+                        }
+                    }
+                    Market::HONGKONG => {
+                        if indicator.value > 0.0 && indicator.value < 2.5 {
+                            score += 10.0;
+                        } else if indicator.value > 4.0 {
+                            score -= 10.0;
+                        }
+                    }
+                    Market::UNKNOWN => {
+                        if indicator.value > 0.0 && indicator.value < 3.0 {
+                            score += 6.0;
+                        } else if indicator.value > 6.0 {
+                            score -= 6.0;
+                        }
                     }
                 },
                 // Additional indicators
@@ -711,7 +754,7 @@ impl StockAnalyzer {
                     } else if indicator.value > 1.5 {
                         score += 3.0;
                     }
-                },
+                }
                 "营收增长率" | "Revenue Growth" => {
                     if indicator.value > 20.0 {
                         score += 8.0;
@@ -720,7 +763,7 @@ impl StockAnalyzer {
                     } else if indicator.value < 0.0 {
                         score -= 8.0;
                     }
-                },
+                }
                 _ => {}
             }
         }
@@ -816,7 +859,11 @@ impl StockAnalyzer {
         score.min(100.0).max(0.0)
     }
 
-    fn generate_recommendation(&self, scores: &AnalysisScores, _technical: &TechnicalAnalysis) -> String {
+    fn generate_recommendation(
+        &self,
+        scores: &AnalysisScores,
+        _technical: &TechnicalAnalysis,
+    ) -> String {
         match scores.comprehensive {
             score if score >= 80.0 => "强烈推荐买入",
             score if score >= 70.0 => "建议买入",
@@ -824,13 +871,21 @@ impl StockAnalyzer {
             score if score >= 40.0 => "观望",
             score if score >= 30.0 => "建议卖出",
             _ => "强烈建议卖出",
-        }.to_string()
+        }
+        .to_string()
     }
 
-    fn generate_fallback_analysis(&self, stock_code: &str, price_info: &PriceInfo, fundamental: &FundamentalData, sentiment: &SentimentAnalysis, market: &Market) -> String {
+    fn generate_fallback_analysis(
+        &self,
+        stock_code: &str,
+        price_info: &PriceInfo,
+        fundamental: &FundamentalData,
+        sentiment: &SentimentAnalysis,
+        market: &Market,
+    ) -> String {
         let currency = market.get_currency();
         let market_name = market.get_market_name();
-        
+
         let mut analysis = format!(
             "基于对{}（{}）的综合分析：\n\n交易市场：{}\n计价货币：{}\n当前股价：{:.2} {}，近期涨跌幅：{:.2}%\n\n基本面亮点：\n",
             stock_code,
@@ -847,14 +902,22 @@ impl StockAnalyzer {
             let mut key_indicators = Vec::new();
             for indicator in &fundamental.financial_indicators {
                 match indicator.name.as_str() {
-                    "流动比率" | "Current Ratio" => key_indicators.push(format!("流动比率: {:.2}", indicator.value)),
-                    "净资产收益率" | "ROE" => key_indicators.push(format!("ROE: {:.2}%", indicator.value)),
-                    "市盈率" | "P/E Ratio" => key_indicators.push(format!("市盈率: {:.2}", indicator.value)),
-                    "净利润率" | "Net Profit Margin" => key_indicators.push(format!("净利润率: {:.2}%", indicator.value)),
+                    "流动比率" | "Current Ratio" => {
+                        key_indicators.push(format!("流动比率: {:.2}", indicator.value))
+                    }
+                    "净资产收益率" | "ROE" => {
+                        key_indicators.push(format!("ROE: {:.2}%", indicator.value))
+                    }
+                    "市盈率" | "P/E Ratio" => {
+                        key_indicators.push(format!("市盈率: {:.2}", indicator.value))
+                    }
+                    "净利润率" | "Net Profit Margin" => {
+                        key_indicators.push(format!("净利润率: {:.2}%", indicator.value))
+                    }
                     _ => {}
                 }
             }
-            
+
             if !key_indicators.is_empty() {
                 analysis.push_str(&key_indicators.join(", "));
                 analysis.push('\n');
@@ -870,11 +933,17 @@ impl StockAnalyzer {
             } else {
                 "中性"
             };
-            analysis.push_str(&format!("\n市场情绪：{} (得分: {:.3})\n", sentiment_desc, sentiment.overall_sentiment));
+            analysis.push_str(&format!(
+                "\n市场情绪：{} (得分: {:.3})\n",
+                sentiment_desc, sentiment.overall_sentiment
+            ));
         }
 
         // 添加技术面简述
-        analysis.push_str(&format!("\n技术面：当前价格波动率 {:.2}%，建议关注技术指标变化\n", price_info.volatility));
+        analysis.push_str(&format!(
+            "\n技术面：当前价格波动率 {:.2}%，建议关注技术指标变化\n",
+            price_info.volatility
+        ));
 
         analysis
     }
@@ -889,26 +958,26 @@ impl Default for TechnicalAnalysis {
             ma20: 0.0,
             ma60: 0.0,
             ma120: 0.0,
-            
+
             // Momentum Indicators
             rsi: 50.0,
             macd_signal: "观望".to_string(),
             macd_line: 0.0,
             macd_histogram: 0.0,
-            
+
             // Volatility Indicators
             bb_position: 0.5,
             bb_upper: 0.0,
             bb_middle: 0.0,
             bb_lower: 0.0,
             atr: 0.0,
-            
+
             // Additional Indicators
             williams_r: -50.0,
             cci: 0.0,
             stochastic_k: 50.0,
             stochastic_d: 50.0,
-            
+
             // Volume and Trend
             volume_status: "正常".to_string(),
             ma_trend: "中性".to_string(),
@@ -932,17 +1001,17 @@ impl Default for PriceInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::data_fetcher::MockDataFetcher;
     use crate::ai_service::AIService;
+    use crate::data_fetcher::MockDataFetcher;
 
     #[tokio::test]
     async fn test_analyze_single_stock() {
         let data_fetcher = Box::new(MockDataFetcher);
         let config = AnalysisConfig::default();
         let ai_service = Arc::new(RwLock::new(AIService::new(AIConfig::default())));
-        
+
         let analyzer = StockAnalyzer::new(data_fetcher, config, ai_service);
-        
+
         let result = analyzer.analyze_single_stock("000001", false).await;
         assert!(result.is_ok());
     }

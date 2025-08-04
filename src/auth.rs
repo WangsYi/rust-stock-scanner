@@ -1,13 +1,13 @@
-use jsonwebtoken::{encode, decode, Header, Validation, EncodingKey, DecodingKey};
-use serde::{Serialize, Deserialize};
 use bcrypt::{hash, verify};
-use uuid::Uuid;
+use chrono::{Duration, Utc};
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use chrono::{Duration, Utc};
+use uuid::Uuid;
 
-use crate::models::{User, LoginRequest, RegisterRequest, AuthResponse, UserResponse, AuthConfig};
+use crate::models::{AuthConfig, AuthResponse, LoginRequest, RegisterRequest, User, UserResponse};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
@@ -25,7 +25,7 @@ pub struct AuthService {
 impl AuthService {
     pub fn new(config: AuthConfig) -> Self {
         let mut users = HashMap::new();
-        
+
         // Add default admin user if no users exist
         if config.enabled {
             let admin = User {
@@ -54,7 +54,7 @@ impl AuthService {
         }
 
         let mut users = self.users.lock().await;
-        
+
         if users.contains_key(&req.username) {
             return Err("Username already exists".to_string());
         }
@@ -91,8 +91,9 @@ impl AuthService {
         }
 
         let mut users = self.users.lock().await;
-        
-        let user = users.get_mut(&req.username)
+
+        let user = users
+            .get_mut(&req.username)
             .ok_or_else(|| "User not found".to_string())?;
 
         if !user.is_active {
@@ -100,7 +101,8 @@ impl AuthService {
         }
 
         if !verify(&req.password, &user.password_hash)
-            .map_err(|_| "Invalid password".to_string())? {
+            .map_err(|_| "Invalid password".to_string())?
+        {
             return Err("Invalid credentials".to_string());
         }
 

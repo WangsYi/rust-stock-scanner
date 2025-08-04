@@ -2,23 +2,127 @@ use chrono::{DateTime, Duration, Utc};
 use reqwest::Client;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::{Duration as StdDuration, Instant};
 
-use crate::models::*;
-use crate::models::Market;
 use crate::cache::CachedDataFetcher;
+use crate::models::Market;
+use crate::models::*;
+
+// Rate limiter for API calls (max 10 requests per second)
+pub struct RateLimiter {
+    request_times: Arc<tokio::sync::Mutex<Vec<Instant>>>,
+}
+
+impl RateLimiter {
+    pub fn new(_max_requests: usize) -> Self {
+        Self {
+            request_times: Arc::new(tokio::sync::Mutex::new(Vec::new())),
+        }
+    }
+
+    pub async fn acquire(&self) -> RateLimiterPermit {
+        let mut times = self.request_times.lock().await;
+        let now = Instant::now();
+
+        // Clean up old requests (older than 1 second)
+        times.retain(|&time| now.duration_since(time) < StdDuration::from_secs(1));
+
+        // If we have too many recent requests, wait
+        if times.len() >= 10 {
+            if let Some(&oldest_time) = times.first() {
+                let wait_time =
+                    StdDuration::from_secs(1).saturating_sub(now.duration_since(oldest_time));
+                if wait_time > StdDuration::from_millis(0) {
+                    drop(times);
+                    tokio::time::sleep(wait_time).await;
+                    times = self.request_times.lock().await;
+                }
+            }
+        }
+
+        // Record this request time
+        times.push(now);
+
+        RateLimiterPermit
+    }
+}
+
+pub struct RateLimiterPermit;
 
 #[async_trait::async_trait]
 pub trait DataFetcher: Send + Sync {
     async fn get_stock_data(&self, stock_code: &str, days: i32) -> Result<Vec<PriceData>, String>;
     async fn get_fundamental_data(&self, stock_code: &str) -> Result<FundamentalData, String>;
-    async fn get_news_data(&self, stock_code: &str, days: i32) -> Result<(Vec<News>, SentimentAnalysis), String>;
+    async fn get_news_data(
+        &self,
+        stock_code: &str,
+        days: i32,
+    ) -> Result<(Vec<News>, SentimentAnalysis), String>;
     async fn get_stock_name(&self, stock_code: &str) -> String;
+
+    // New method for concurrent data fetching
+    async fn get_all_data_concurrent(
+        &self,
+        stock_code: &str,
+        days: i32,
+    ) -> Result<
+        (
+            Vec<PriceData>,
+            FundamentalData,
+            (Vec<News>, SentimentAnalysis),
+            String,
+        ),
+        String,
+    > {
+        let stock_code_clone = stock_code.to_string();
+
+        // Spawn all three requests concurrently
+        let price_future = tokio::spawn({
+            let fetcher = self.clone();
+            async move { fetcher.get_stock_data(&stock_code_clone, days).await }
+        });
+
+        let fundamental_future = tokio::spawn({
+            let stock_code_clone = stock_code.to_string();
+            let fetcher = self.clone();
+            async move { fetcher.get_fundamental_data(&stock_code_clone).await }
+        });
+
+        let news_future = tokio::spawn({
+            let stock_code_clone = stock_code.to_string();
+            let fetcher = self.clone();
+            async move { fetcher.get_news_data(&stock_code_clone, days).await }
+        });
+
+        let name_future = tokio::spawn({
+            let stock_code_clone = stock_code.to_string();
+            let fetcher = self.clone();
+            async move { fetcher.get_stock_name(&stock_code_clone).await }
+        });
+
+        // Wait for all results
+        let (price_result, fundamental_result, news_result, name_result) =
+            tokio::join!(price_future, fundamental_future, news_future, name_future);
+
+        let price_data = price_result.map_err(|e| format!("Price task failed: {}", e))??;
+        let fundamental_data =
+            fundamental_result.map_err(|e| format!("Fundamental task failed: {}", e))??;
+        let news_data = news_result.map_err(|e| format!("News task failed: {}", e))??;
+        let stock_name = name_result.map_err(|e| format!("Name task failed: {}", e))?;
+
+        Ok((price_data, fundamental_data, news_data, stock_name))
+    }
+
+    // Helper method for cloning
+    fn clone(&self) -> Box<dyn DataFetcher>;
 }
 
 pub struct AkshareProxy {
     client: Client,
     base_url: String,
     timeout: std::time::Duration,
+    rate_limiter: Arc<RateLimiter>,
 }
 
 impl AkshareProxy {
@@ -32,24 +136,45 @@ impl AkshareProxy {
             client,
             base_url,
             timeout: std::time::Duration::from_secs(timeout_secs),
+            rate_limiter: Arc::new(RateLimiter::new(10)), // Max 10 requests per second
         }
     }
 
     async fn make_request(&self, endpoint: &str) -> Result<Value, String> {
+        // Acquire rate limit permit
+        let _permit = self.rate_limiter.acquire().await;
+
         let url = format!("{}/{}", self.base_url, endpoint);
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
             .send()
             .await
             .map_err(|e| format!("Request failed: {}", e))?;
 
         if !response.status().is_success() {
-            return Err(format!("HTTP {}: {}", response.status(), response.text().await.unwrap_or_default()));
+            return Err(format!(
+                "HTTP {}: {}",
+                response.status(),
+                response.text().await.unwrap_or_default()
+            ));
         }
 
-        response.json::<Value>()
+        response
+            .json::<Value>()
             .await
             .map_err(|e| format!("JSON parse failed: {}", e))
+    }
+}
+
+impl Clone for AkshareProxy {
+    fn clone(&self) -> Self {
+        Self {
+            client: self.client.clone(),
+            base_url: self.base_url.clone(),
+            timeout: self.timeout,
+            rate_limiter: self.rate_limiter.clone(),
+        }
     }
 }
 
@@ -63,11 +188,11 @@ impl DataFetcher for AkshareProxy {
             Market::US => format!("api/stock/us/{}/price?days={}", stock_code, days),
             Market::UNKNOWN => format!("api/stock/{}/price?days={}", stock_code, days),
         };
-        
+
         match self.make_request(&endpoint).await {
             Ok(data) => {
                 let mut prices = Vec::new();
-                
+
                 if let Some(items) = data.as_array() {
                     for item in items {
                         let date_str = item["date"].as_str().unwrap_or("");
@@ -82,25 +207,26 @@ impl DataFetcher for AkshareProxy {
                             high: item["high"].as_f64().unwrap_or(0.0),
                             low: item["low"].as_f64().unwrap_or(0.0),
                             volume: item["volume"].as_i64().unwrap_or(0),
-                            change_pct: 0.0, // Will be calculated
-                            turnover: 0.0, // Will be calculated
+                            change_pct: 0.0,  // Will be calculated
+                            turnover: 0.0,    // Will be calculated
                             turnover_rt: 0.0, // Will be calculated
                         });
                     }
-                    
+
                     // Sort by date ascending
                     prices.sort_by(|a, b| a.date.cmp(&b.date));
-                    
+
                     // Calculate additional fields
                     let mut change_pcts = Vec::with_capacity(prices.len());
                     let mut turnovers = Vec::with_capacity(prices.len());
                     let mut turnover_rts = Vec::with_capacity(prices.len());
-                    
+
                     for i in 0..prices.len() {
                         if i > 0 {
-                            let prev_close = prices[i-1].close;
+                            let prev_close = prices[i - 1].close;
                             if prev_close > 0.0 {
-                                change_pcts.push(((prices[i].close - prev_close) / prev_close) * 100.0);
+                                change_pcts
+                                    .push(((prices[i].close - prev_close) / prev_close) * 100.0);
                             } else {
                                 change_pcts.push(0.0);
                             }
@@ -110,7 +236,7 @@ impl DataFetcher for AkshareProxy {
                         turnovers.push(prices[i].volume as f64 * prices[i].close);
                         turnover_rts.push(prices[i].volume as f64 / 100_000_000.0);
                     }
-                    
+
                     // Apply calculated values
                     for (i, price) in prices.iter_mut().enumerate() {
                         price.change_pct = change_pcts[i];
@@ -118,7 +244,7 @@ impl DataFetcher for AkshareProxy {
                         price.turnover_rt = turnover_rts[i];
                     }
                 }
-                
+
                 Ok(prices)
             }
             Err(_) => {
@@ -136,11 +262,11 @@ impl DataFetcher for AkshareProxy {
             Market::US => format!("api/stock/us/{}/fundamental", stock_code),
             Market::UNKNOWN => format!("api/stock/{}/fundamental", stock_code),
         };
-        
+
         match self.make_request(&endpoint).await {
             Ok(data) => {
                 let mut indicators = Vec::new();
-                
+
                 if let Some(indicator_array) = data["financial_indicators"].as_array() {
                     for indicator in indicator_array {
                         indicators.push(FinancialIndicator {
@@ -162,11 +288,21 @@ impl DataFetcher for AkshareProxy {
 
                 // Enhanced fundamental data
                 let performance_forecasts = PerformanceForecasts {
-                    revenue_growth_forecast: data["performance_forecasts"]["revenue_growth_forecast"].as_f64(),
-                    earnings_growth_forecast: data["performance_forecasts"]["earnings_growth_forecast"].as_f64(),
+                    revenue_growth_forecast: data["performance_forecasts"]
+                        ["revenue_growth_forecast"]
+                        .as_f64(),
+                    earnings_growth_forecast: data["performance_forecasts"]
+                        ["earnings_growth_forecast"]
+                        .as_f64(),
                     target_price: data["performance_forecasts"]["target_price"].as_f64(),
-                    analyst_rating: data["performance_forecasts"]["analyst_rating"].as_str().unwrap_or("未评级").to_string(),
-                    forecast_period: data["performance_forecasts"]["forecast_period"].as_str().unwrap_or("12个月").to_string(),
+                    analyst_rating: data["performance_forecasts"]["analyst_rating"]
+                        .as_str()
+                        .unwrap_or("未评级")
+                        .to_string(),
+                    forecast_period: data["performance_forecasts"]["forecast_period"]
+                        .as_str()
+                        .unwrap_or("12个月")
+                        .to_string(),
                 };
 
                 let risk_assessment = RiskAssessment {
@@ -175,15 +311,28 @@ impl DataFetcher for AkshareProxy {
                     current_ratio: data["risk_assessment"]["current_ratio"].as_f64(),
                     quick_ratio: data["risk_assessment"]["quick_ratio"].as_f64(),
                     interest_coverage: data["risk_assessment"]["interest_coverage"].as_f64(),
-                    risk_level: data["risk_assessment"]["risk_level"].as_str().unwrap_or("中等").to_string(),
+                    risk_level: data["risk_assessment"]["risk_level"]
+                        .as_str()
+                        .unwrap_or("中等")
+                        .to_string(),
                 };
 
                 let financial_health = FinancialHealth {
-                    profitability_score: data["financial_health"]["profitability_score"].as_f64().unwrap_or(50.0),
-                    liquidity_score: data["financial_health"]["liquidity_score"].as_f64().unwrap_or(50.0),
-                    solvency_score: data["financial_health"]["solvency_score"].as_f64().unwrap_or(50.0),
-                    efficiency_score: data["financial_health"]["efficiency_score"].as_f64().unwrap_or(50.0),
-                    overall_health_score: data["financial_health"]["overall_health_score"].as_f64().unwrap_or(50.0),
+                    profitability_score: data["financial_health"]["profitability_score"]
+                        .as_f64()
+                        .unwrap_or(50.0),
+                    liquidity_score: data["financial_health"]["liquidity_score"]
+                        .as_f64()
+                        .unwrap_or(50.0),
+                    solvency_score: data["financial_health"]["solvency_score"]
+                        .as_f64()
+                        .unwrap_or(50.0),
+                    efficiency_score: data["financial_health"]["efficiency_score"]
+                        .as_f64()
+                        .unwrap_or(50.0),
+                    overall_health_score: data["financial_health"]["overall_health_score"]
+                        .as_f64()
+                        .unwrap_or(50.0),
                 };
 
                 Ok(FundamentalData {
@@ -203,7 +352,11 @@ impl DataFetcher for AkshareProxy {
         }
     }
 
-    async fn get_news_data(&self, stock_code: &str, days: i32) -> Result<(Vec<News>, SentimentAnalysis), String> {
+    async fn get_news_data(
+        &self,
+        stock_code: &str,
+        days: i32,
+    ) -> Result<(Vec<News>, SentimentAnalysis), String> {
         let market = Market::from_stock_code(stock_code);
         let endpoint = match market {
             Market::ASHARES => format!("api/stock/{}/news?days={}", stock_code, days),
@@ -211,11 +364,11 @@ impl DataFetcher for AkshareProxy {
             Market::US => format!("api/stock/us/{}/news?days={}", stock_code, days),
             Market::UNKNOWN => format!("api/stock/{}/news?days={}", stock_code, days),
         };
-        
+
         match self.make_request(&endpoint).await {
             Ok(data) => {
                 let mut news = Vec::new();
-                
+
                 if let Some(news_array) = data["news"].as_array() {
                     for item in news_array {
                         let date_str = item["date"].as_str().unwrap_or("");
@@ -257,7 +410,10 @@ impl DataFetcher for AkshareProxy {
 
                 let sentiment_analysis = SentimentAnalysis {
                     overall_sentiment: sentiment_data["overall_sentiment"].as_f64().unwrap_or(0.0),
-                    sentiment_trend: sentiment_data["sentiment_trend"].as_str().unwrap_or("中性").to_string(),
+                    sentiment_trend: sentiment_data["sentiment_trend"]
+                        .as_str()
+                        .unwrap_or("中性")
+                        .to_string(),
                     confidence_score: sentiment_data["confidence_score"].as_f64().unwrap_or(0.75),
                     total_analyzed: sentiment_data["total_analyzed"].as_i64().unwrap_or(0) as i32,
                     sentiment_by_type,
@@ -275,32 +431,47 @@ impl DataFetcher for AkshareProxy {
 
     async fn get_stock_name(&self, stock_code: &str) -> String {
         let endpoint = format!("api/stock/{}/name", stock_code);
-        
+
         match self.make_request(&endpoint).await {
             Ok(data) => data["name"].as_str().unwrap_or("").to_string(),
             Err(_) => format!("{}股票", stock_code),
         }
     }
+
+    fn clone(&self) -> Box<dyn DataFetcher> {
+        Box::new(Clone::clone(self))
+    }
 }
 
 impl AkshareProxy {
-    fn get_mock_stock_data(&self, stock_code: &str, days: i32, market: &Market) -> Result<Vec<PriceData>, String> {
+    fn get_mock_stock_data(
+        &self,
+        stock_code: &str,
+        days: i32,
+        market: &Market,
+    ) -> Result<Vec<PriceData>, String> {
         let _rng = rand::thread_rng();
-        
+
         // Market-specific base price ranges
         let base_price = match market {
-            Market::ASHARES => 10.0 + (stock_code.chars().map(|c| c as u32).sum::<u32>() % 100) as f64,
-            Market::HONGKONG => 50.0 + (stock_code.chars().map(|c| c as u32).sum::<u32>() % 200) as f64,
+            Market::ASHARES => {
+                10.0 + (stock_code.chars().map(|c| c as u32).sum::<u32>() % 100) as f64
+            }
+            Market::HONGKONG => {
+                50.0 + (stock_code.chars().map(|c| c as u32).sum::<u32>() % 200) as f64
+            }
             Market::US => 100.0 + (stock_code.chars().map(|c| c as u32).sum::<u32>() % 400) as f64,
-            Market::UNKNOWN => 50.0 + (stock_code.chars().map(|c| c as u32).sum::<u32>() % 100) as f64,
+            Market::UNKNOWN => {
+                50.0 + (stock_code.chars().map(|c| c as u32).sum::<u32>() % 100) as f64
+            }
         };
-        
+
         let mut prices = Vec::new();
         let mut current_price = base_price;
-        
+
         for i in (0..days).rev() {
             let date = Utc::now() - Duration::days(i as i64);
-            
+
             // Market-specific volatility
             let volatility_factor = match market {
                 Market::ASHARES => 0.1,
@@ -308,13 +479,13 @@ impl AkshareProxy {
                 Market::US => 0.08,
                 Market::UNKNOWN => 0.12,
             };
-            
+
             let change = (rand::random::<f64>() - 0.5) * volatility_factor;
             let open = current_price * (1.0 + (rand::random::<f64>() - 0.5) * 0.02);
             let close = open * (1.0 + change);
             let high = open.max(close) * (1.0 + rand::random::<f64>() * 0.03);
             let low = open.min(close) * (1.0 - rand::random::<f64>() * 0.03);
-            
+
             // Market-specific volume ranges
             let volume = match market {
                 Market::ASHARES => 1_000_000 + rand::random::<i64>().rem_euclid(5_000_000),
@@ -322,7 +493,7 @@ impl AkshareProxy {
                 Market::US => 100_000 + rand::random::<i64>().rem_euclid(1_000_000),
                 Market::UNKNOWN => 500_000 + rand::random::<i64>().rem_euclid(2_000_000),
             };
-            
+
             prices.push(PriceData {
                 date,
                 open,
@@ -334,16 +505,20 @@ impl AkshareProxy {
                 turnover: volume as f64 * close,
                 turnover_rt: volume as f64 / 100_000_000.0,
             });
-            
+
             current_price = close;
         }
-        
+
         Ok(prices)
     }
 
-    fn get_mock_fundamental_data(&self, stock_code: &str, market: &Market) -> Result<FundamentalData, String> {
+    fn get_mock_fundamental_data(
+        &self,
+        stock_code: &str,
+        market: &Market,
+    ) -> Result<FundamentalData, String> {
         let hash = stock_code.chars().map(|c| c as u32).sum::<u32>();
-        
+
         let (indicators, industry, sector) = match market {
             Market::ASHARES => {
                 let indicators = vec![
@@ -369,7 +544,7 @@ impl AkshareProxy {
                     },
                 ];
                 (indicators, "科技".to_string(), "信息技术".to_string())
-            },
+            }
             Market::HONGKONG => {
                 let indicators = vec![
                     FinancialIndicator {
@@ -394,7 +569,7 @@ impl AkshareProxy {
                     },
                 ];
                 (indicators, "金融".to_string(), "金融服务".to_string())
-            },
+            }
             Market::US => {
                 let indicators = vec![
                     FinancialIndicator {
@@ -418,8 +593,12 @@ impl AkshareProxy {
                         unit: "x".to_string(),
                     },
                 ];
-                (indicators, "Technology".to_string(), "Information Technology".to_string())
-            },
+                (
+                    indicators,
+                    "Technology".to_string(),
+                    "Information Technology".to_string(),
+                )
+            }
             Market::UNKNOWN => {
                 let indicators = vec![
                     FinancialIndicator {
@@ -444,7 +623,7 @@ impl AkshareProxy {
                     },
                 ];
                 (indicators, "Unknown".to_string(), "General".to_string())
-            },
+            }
         };
 
         let mut valuation = std::collections::HashMap::new();
@@ -494,9 +673,13 @@ impl AkshareProxy {
             current_ratio: Some(1.5 + (hash % 10) as f64 / 10.0),
             quick_ratio: Some(1.2 + (hash % 8) as f64 / 10.0),
             interest_coverage: Some(3.0 + (hash % 15) as f64),
-            risk_level: if hash % 100 < 30 { "低风险".to_string() } 
-                        else if hash % 100 < 70 { "中等风险".to_string() } 
-                        else { "高风险".to_string() },
+            risk_level: if hash % 100 < 30 {
+                "低风险".to_string()
+            } else if hash % 100 < 70 {
+                "中等风险".to_string()
+            } else {
+                "高风险".to_string()
+            },
         };
 
         let financial_health = FinancialHealth {
@@ -518,10 +701,15 @@ impl AkshareProxy {
         })
     }
 
-    fn get_mock_news_data(&self, stock_code: &str, days: i32, market: &Market) -> Result<(Vec<News>, SentimentAnalysis), String> {
+    fn get_mock_news_data(
+        &self,
+        stock_code: &str,
+        days: i32,
+        market: &Market,
+    ) -> Result<(Vec<News>, SentimentAnalysis), String> {
         let _rng = rand::thread_rng();
         let hash = stock_code.chars().map(|c| c as u32).sum::<u32>();
-        
+
         // Market-specific news sources
         let (news_sources, market_prefix) = match market {
             Market::ASHARES => (vec!["新浪财经", "东方财富", "证券时报"], "A股"),
@@ -529,16 +717,22 @@ impl AkshareProxy {
             Market::US => (vec!["Bloomberg", "Reuters", "Wall Street Journal"], "美股"),
             Market::UNKNOWN => (vec!["Financial Times", "MarketWatch"], "股市"),
         };
-        
+
         let mut news = Vec::new();
         for i in 0..20 {
             let date = Utc::now() - Duration::days((i % days.max(1) as u32) as i64);
             let sentiment = ((hash + i as u32) % 200) as f64 / 100.0 - 1.0;
             let source = news_sources[i as usize % news_sources.len()];
-            
+
             news.push(News {
                 title: format!("{}{}相关新闻{}", market_prefix, stock_code, i + 1),
-                content: format!("这是{}{}的第{}条新闻内容，来自{}", market_prefix, stock_code, i + 1, source),
+                content: format!(
+                    "这是{}{}的第{}条新闻内容，来自{}",
+                    market_prefix,
+                    stock_code,
+                    i + 1,
+                    source
+                ),
                 date,
                 source: source.to_string(),
                 news_type: "company_news".to_string(),
@@ -548,10 +742,10 @@ impl AkshareProxy {
         }
 
         let overall_sentiment = news.iter().map(|n| n.sentiment).sum::<f64>() / news.len() as f64;
-        
+
         let mut sentiment_by_type = std::collections::HashMap::new();
         sentiment_by_type.insert("company_news".to_string(), overall_sentiment);
-        
+
         let mut news_distribution = std::collections::HashMap::new();
         news_distribution.insert("company_news".to_string(), news.len() as i32);
 
@@ -601,7 +795,11 @@ impl DataFetcher for MockDataFetcher {
             .get_mock_fundamental_data(stock_code, &market)
     }
 
-    async fn get_news_data(&self, stock_code: &str, days: i32) -> Result<(Vec<News>, SentimentAnalysis), String> {
+    async fn get_news_data(
+        &self,
+        stock_code: &str,
+        days: i32,
+    ) -> Result<(Vec<News>, SentimentAnalysis), String> {
         let market = Market::from_stock_code(stock_code);
         AkshareProxy::new("http://localhost:5000".to_string(), 30)
             .get_mock_news_data(stock_code, days, &market)
@@ -658,5 +856,9 @@ impl DataFetcher for MockDataFetcher {
             Market::US => format!("{} Corp.", stock_code),
             Market::UNKNOWN => format!("{}股票", stock_code),
         }
+    }
+
+    fn clone(&self) -> Box<dyn DataFetcher> {
+        Box::new(MockDataFetcher)
     }
 }
