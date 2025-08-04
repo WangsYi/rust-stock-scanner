@@ -27,11 +27,11 @@
     "enable_migrations": true
   },
   "ai": {
-    "provider": "glm",
-    "api_key": "",
-    "model": "glm-4",
+    "provider": "openai",
+    "api_key": "your-api-key-here",
+    "model": "gpt-4o",
     "enabled": true,
-    "timeout_seconds": 120
+    "timeout_seconds": 30
   },
   "auth": {
     "enabled": false,
