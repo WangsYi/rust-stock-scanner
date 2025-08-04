@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc, Timelike};
+use chrono::{DateTime, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -27,14 +27,14 @@ impl CurrencyConverter {
     pub fn new(base_currency: String, cache_ttl_seconds: i64) -> Self {
         let mut rates = HashMap::new();
         rates.insert(base_currency.clone(), 1.0); // Base currency to itself is 1.0
-        
+
         // Initialize with some common exchange rates (in a real app, these would come from an API)
         rates.insert("CNY".to_string(), 0.14); // USD to CNY
         rates.insert("HKD".to_string(), 0.13); // USD to HKD
         rates.insert("EUR".to_string(), 1.08); // USD to EUR
         rates.insert("GBP".to_string(), 1.27); // USD to GBP
         rates.insert("JPY".to_string(), 0.0064); // USD to JPY
-        
+
         Self {
             rates: Arc::new(RwLock::new(rates)),
             last_updated: Arc::new(RwLock::new(Utc::now())),
@@ -43,52 +43,76 @@ impl CurrencyConverter {
         }
     }
 
-    pub async fn get_exchange_rate(&self, from_currency: &str, to_currency: &str) -> Result<f64, String> {
+    pub async fn get_exchange_rate(
+        &self,
+        from_currency: &str,
+        to_currency: &str,
+    ) -> Result<f64, String> {
         if from_currency == to_currency {
             return Ok(1.0);
         }
 
         let rates = self.rates.read().await;
-        
+
         // If both currencies are in our cache
-        if let (Some(&from_rate), Some(&to_rate)) = (rates.get(from_currency), rates.get(to_currency)) {
+        if let (Some(&from_rate), Some(&to_rate)) =
+            (rates.get(from_currency), rates.get(to_currency))
+        {
             return Ok(to_rate / from_rate);
         }
 
         // If we have the inverse rate
-        if let (Some(&to_rate), Some(&from_rate)) = (rates.get(to_currency), rates.get(from_currency)) {
+        if let (Some(&to_rate), Some(&from_rate)) =
+            (rates.get(to_currency), rates.get(from_currency))
+        {
             return Ok(from_rate / to_rate);
         }
 
-        Err(format!("Exchange rate not found for {} to {}", from_currency, to_currency))
+        Err(format!(
+            "Exchange rate not found for {} to {}",
+            from_currency, to_currency
+        ))
     }
 
-    pub async fn convert_amount(&self, amount: f64, from_currency: &str, to_currency: &str) -> Result<f64, String> {
+    pub async fn convert_amount(
+        &self,
+        amount: f64,
+        from_currency: &str,
+        to_currency: &str,
+    ) -> Result<f64, String> {
         let rate = self.get_exchange_rate(from_currency, to_currency).await?;
         Ok(amount * rate)
     }
 
     pub async fn convert_to_base(&self, amount: f64, currency: &str) -> Result<f64, String> {
-        self.convert_amount(amount, currency, &self.base_currency).await
+        self.convert_amount(amount, currency, &self.base_currency)
+            .await
     }
 
     pub async fn convert_from_base(&self, amount: f64, currency: &str) -> Result<f64, String> {
-        self.convert_amount(amount, &self.base_currency, currency).await
+        self.convert_amount(amount, &self.base_currency, currency)
+            .await
     }
 
-    pub async fn convert_between_markets(&self, amount: f64, from_market: &Market, to_market: &Market) -> Result<f64, String> {
+    pub async fn convert_between_markets(
+        &self,
+        amount: f64,
+        from_market: &Market,
+        to_market: &Market,
+    ) -> Result<f64, String> {
         let from_currency = from_market.get_currency();
         let to_currency = to_market.get_currency();
-        self.convert_amount(amount, from_currency, to_currency).await
+        self.convert_amount(amount, from_currency, to_currency)
+            .await
     }
 
     pub async fn update_rates(&self, new_rates: HashMap<String, f64>) -> Result<(), String> {
         let mut rates = self.rates.write().await;
         let mut last_updated = self.last_updated.write().await;
-        
+
         *rates = new_rates;
         *last_updated = Utc::now();
-        
+
         Ok(())
     }
 
@@ -102,7 +126,10 @@ impl CurrencyConverter {
 
     pub async fn is_cache_expired(&self) -> bool {
         let last_updated = self.last_updated.read().await;
-        Utc::now().signed_duration_since(*last_updated).num_seconds() > self.cache_ttl_seconds
+        Utc::now()
+            .signed_duration_since(*last_updated)
+            .num_seconds()
+            > self.cache_ttl_seconds
     }
 
     pub async fn get_supported_currencies(&self) -> Vec<String> {
@@ -211,20 +238,21 @@ impl MarketTimeInfo {
 
         let sessions = market.get_trading_sessions();
         let current_session = if is_open {
-            sessions.iter()
+            sessions
+                .iter()
                 .find(|(open, close)| {
                     let current_hour = current_time.hour();
                     let current_min = current_time.minute();
                     let current_time_minutes = current_hour * 60 + current_min;
-                    
+
                     let open_hour = open[..2].parse::<u32>().unwrap_or(9);
                     let open_min = open[3..].parse::<u32>().unwrap_or(30);
                     let close_hour = close[..2].parse::<u32>().unwrap_or(16);
                     let close_min = close[3..].parse::<u32>().unwrap_or(0);
-                    
+
                     let open_minutes = open_hour * 60 + open_min;
                     let close_minutes = close_hour * 60 + close_min;
-                    
+
                     current_time_minutes >= open_minutes && current_time_minutes <= close_minutes
                 })
                 .map(|(open, close)| format!("{}-{}", open, close))
@@ -235,26 +263,27 @@ impl MarketTimeInfo {
         // Calculate next session times
         let (next_open, next_close) = if is_open {
             // Current session times - calculate when it closes
-            if let Some((_, close)) = sessions.iter()
-                .find(|(open, close)| {
-                    let current_hour = current_time.hour();
-                    let current_min = current_time.minute();
-                    let current_time_minutes = current_hour * 60 + current_min;
-                    
-                    let open_hour = open[..2].parse::<u32>().unwrap_or(9);
-                    let open_min = open[3..].parse::<u32>().unwrap_or(30);
-                    let close_hour = close[..2].parse::<u32>().unwrap_or(16);
-                    let close_min = close[3..].parse::<u32>().unwrap_or(0);
-                    
-                    let open_minutes = open_hour * 60 + open_min;
-                    let close_minutes = close_hour * 60 + close_min;
-                    
-                    current_time_minutes >= open_minutes && current_time_minutes <= close_minutes
-                }) {
+            if let Some((_, close)) = sessions.iter().find(|(open, close)| {
+                let current_hour = current_time.hour();
+                let current_min = current_time.minute();
+                let current_time_minutes = current_hour * 60 + current_min;
+
+                let open_hour = open[..2].parse::<u32>().unwrap_or(9);
+                let open_min = open[3..].parse::<u32>().unwrap_or(30);
+                let close_hour = close[..2].parse::<u32>().unwrap_or(16);
+                let close_min = close[3..].parse::<u32>().unwrap_or(0);
+
+                let open_minutes = open_hour * 60 + open_min;
+                let close_minutes = close_hour * 60 + close_min;
+
+                current_time_minutes >= open_minutes && current_time_minutes <= close_minutes
+            }) {
                 // Current session close time
                 let close_hour = close[..2].parse::<u32>().unwrap_or(16);
                 let close_min = close[3..].parse::<u32>().unwrap_or(0);
-                let close_time = current_time.date_naive().and_hms_opt(close_hour, close_min, 0)
+                let close_time = current_time
+                    .date_naive()
+                    .and_hms_opt(close_hour, close_min, 0)
                     .map(|dt| dt.and_utc());
                 (None, close_time)
             } else {
@@ -263,18 +292,20 @@ impl MarketTimeInfo {
         } else {
             // Next trading day session times
             let next_trading_day = market.get_next_trading_day(current_time.date_naive());
-            
+
             if let Some((open, close)) = sessions.first() {
                 let open_hour = open[..2].parse::<u32>().unwrap_or(9);
                 let open_min = open[3..].parse::<u32>().unwrap_or(30);
                 let close_hour = close[..2].parse::<u32>().unwrap_or(16);
                 let close_min = close[3..].parse::<u32>().unwrap_or(0);
-                
-                let next_open = next_trading_day.and_hms_opt(open_hour, open_min, 0)
+
+                let next_open = next_trading_day
+                    .and_hms_opt(open_hour, open_min, 0)
                     .map(|dt| dt.and_utc());
-                let next_close = next_trading_day.and_hms_opt(close_hour, close_min, 0)
+                let next_close = next_trading_day
+                    .and_hms_opt(close_hour, close_min, 0)
                     .map(|dt| dt.and_utc());
-                
+
                 (next_open, next_close)
             } else {
                 (None, None)
