@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc, Datelike, Timelike, NaiveDate};
+use chrono::{DateTime, Datelike, NaiveDate, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use std::collections::HashMap;
@@ -8,9 +8,9 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Market {
-    ASHARES,    // A股
-    HONGKONG,   // 港股
-    US,         // 美股
+    ASHARES,  // A股
+    HONGKONG, // 港股
+    US,       // 美股
     UNKNOWN,
 }
 
@@ -51,7 +51,7 @@ pub struct FundamentalData {
     pub valuation: HashMap<String, f64>,
     pub industry: String,
     pub sector: String,
-    
+
     // Enhanced fundamental analysis
     pub performance_forecasts: PerformanceForecasts,
     pub risk_assessment: RiskAssessment,
@@ -94,26 +94,26 @@ pub struct TechnicalAnalysis {
     pub ma20: f64,
     pub ma60: f64,
     pub ma120: f64,
-    
+
     // Momentum Indicators
     pub rsi: f64,
     pub macd_signal: String,
     pub macd_line: f64,
     pub macd_histogram: f64,
-    
+
     // Volatility Indicators
     pub bb_position: f64,
     pub bb_upper: f64,
     pub bb_middle: f64,
     pub bb_lower: f64,
     pub atr: f64,
-    
+
     // Additional Indicators
     pub williams_r: f64,
     pub cci: f64,
     pub stochastic_k: f64,
     pub stochastic_d: f64,
-    
+
     // Volume and Trend
     pub volume_status: String,
     pub ma_trend: String,
@@ -217,8 +217,10 @@ impl Market {
         // Some special cases
         else {
             match stock_code.to_uppercase().as_str() {
-                "AAPL" | "MSFT" | "GOOGL" | "AMZN" | "TSLA" | "META" | "NVDA" | "JPM" | "JNJ" | "V" => Market::US,
-                "00700" | "00941" | "03690" | "00388" | "00939" | "00005" | "01299" | "00883" | "00960" | "00772" => Market::HONGKONG,
+                "AAPL" | "MSFT" | "GOOGL" | "AMZN" | "TSLA" | "META" | "NVDA" | "JPM" | "JNJ"
+                | "V" => Market::US,
+                "00700" | "00941" | "03690" | "00388" | "00939" | "00005" | "01299" | "00883"
+                | "00960" | "00772" => Market::HONGKONG,
                 _ => Market::UNKNOWN,
             }
         }
@@ -290,29 +292,29 @@ impl Market {
     pub fn is_market_open(&self, time: chrono::DateTime<chrono::Utc>) -> bool {
         let (open_time, close_time) = self.get_trading_hours();
         let market_time = time.with_timezone(&chrono::Local);
-        
+
         let open_hour = open_time[..2].parse::<u32>().unwrap_or(9);
         let open_min = open_time[3..].parse::<u32>().unwrap_or(30);
         let close_hour = close_time[..2].parse::<u32>().unwrap_or(15);
         let close_min = close_time[3..].parse::<u32>().unwrap_or(0);
-        
+
         let current_hour = market_time.hour();
         let current_min = market_time.minute();
-        
+
         let current_time = current_hour * 60 + current_min;
         let open_minutes = open_hour * 60 + open_min;
         let close_minutes = close_hour * 60 + close_min;
-        
+
         current_time >= open_minutes && current_time <= close_minutes
     }
 
     pub fn get_next_trading_day(&self, date: NaiveDate) -> NaiveDate {
         let mut next_day = date.succ_opt().unwrap_or(date);
-        
+
         while !self.is_trading_day(next_day) {
             next_day = next_day.succ_opt().unwrap_or(next_day);
         }
-        
+
         next_day
     }
 
@@ -330,7 +332,7 @@ impl Market {
                     NaiveDate::from_ymd_opt(year, 10, 2).unwrap(),
                     NaiveDate::from_ymd_opt(year, 10, 3).unwrap(),
                 ]
-            },
+            }
             Market::HONGKONG => {
                 vec![
                     // Some Hong Kong holidays
@@ -338,7 +340,7 @@ impl Market {
                     NaiveDate::from_ymd_opt(year, 12, 25).unwrap(), // Christmas
                     NaiveDate::from_ymd_opt(year, 12, 26).unwrap(), // Boxing Day
                 ]
-            },
+            }
             Market::US => {
                 vec![
                     // US holidays
@@ -346,22 +348,16 @@ impl Market {
                     NaiveDate::from_ymd_opt(year, 7, 4).unwrap(), // Independence Day
                     NaiveDate::from_ymd_opt(year, 12, 25).unwrap(), // Christmas
                 ]
-            },
+            }
             Market::UNKNOWN => vec![],
         }
     }
 
     pub fn get_market_indicators(&self) -> Vec<&'static str> {
         match self {
-            Market::ASHARES => vec![
-                "上证指数", "深证成指", "创业板指", "科创50", "北证50"
-            ],
-            Market::HONGKONG => vec![
-                "恒生指数", "国企指数", "红筹指数", "恒生科技指数"
-            ],
-            Market::US => vec![
-                "道琼斯指数", "标普500指数", "纳斯达克指数", "罗素2000指数"
-            ],
+            Market::ASHARES => vec!["上证指数", "深证成指", "创业板指", "科创50", "北证50"],
+            Market::HONGKONG => vec!["恒生指数", "国企指数", "红筹指数", "恒生科技指数"],
+            Market::US => vec!["道琼斯指数", "标普500指数", "纳斯达克指数", "罗素2000指数"],
             Market::UNKNOWN => vec!["未知指数"],
         }
     }

@@ -28,7 +28,7 @@
   },
   "ai": {
     "provider": "glm",
-    "api_key": "",
+    "api_key": "e255da881e8849e39bceca5362b30cb3.SBnj4V3WO3BvEbvv",
     "model": "glm-4",
     "enabled": true,
     "timeout_seconds": 120
