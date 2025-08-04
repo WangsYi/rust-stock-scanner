@@ -49,11 +49,10 @@ impl StockAnalyzer {
 
     pub async fn analyze_single_stock(&self, stock_code: &str, enable_ai: bool) -> Result<AnalysisReport, String> {
         let market = Market::from_stock_code(stock_code);
-        let stock_name = self.data_fetcher.get_stock_name(stock_code).await;
         
-        let price_data = self.data_fetcher.get_stock_data(stock_code, self.config.parameters.technical_period_days).await?;
-        let fundamental_data = self.data_fetcher.get_fundamental_data(stock_code).await?;
-        let (news_data, sentiment_data) = self.data_fetcher.get_news_data(stock_code, self.config.parameters.sentiment_period_days).await?;
+        // Use concurrent data fetching for better performance
+        let (price_data, fundamental_data, (news_data, sentiment_data), stock_name) = 
+            self.data_fetcher.get_all_data_concurrent(stock_code, self.config.parameters.technical_period_days).await?;
 
         let technical = self.calculate_technical_analysis(&price_data);
         let price_info = self.calculate_price_info(&price_data);
@@ -76,7 +75,7 @@ impl StockAnalyzer {
 
         let recommendation = self.generate_recommendation(&scores, &technical);
         
-          let ai_analysis = if enable_ai {
+          let (ai_analysis, fallback_used, fallback_reason) = if enable_ai {
             let ai_service = self.ai_service.read().await;
             let report_for_ai = AnalysisReport {
                 stock_code: stock_code.to_string(),
@@ -95,18 +94,26 @@ impl StockAnalyzer {
                     total_news_count: news_data.len() as i32,
                     analysis_completeness: "完整".to_string(),
                 },
+                fallback_used: false,
+                fallback_reason: None,
             };
             
             match ai_service.generate_analysis(&report_for_ai).await {
-                Ok(analysis) => analysis,
-                Err(_) => {
-                    // Use AI service's fallback analysis instead of analyzer's
-                    ai_service.generate_fallback_analysis(&report_for_ai)
+                Ok(analysis) => (analysis, false, None),
+                Err(err) => {
+                    log::error!("Failed to generate AI analysis: {}", err);
+                    let reason = format!("AI分析失败: {}", err);
+                    let mut fallback_report = report_for_ai.clone();
+                    fallback_report.fallback_used = true;
+                    fallback_report.fallback_reason = Some(reason.clone());
+                    let fallback_analysis = ai_service.generate_fallback_analysis(&fallback_report);
+                    (fallback_analysis, true, Some(reason))
                 }
             }
         } else {
             // Even when AI is disabled, use the detailed fallback analysis from AI service
             let ai_service = self.ai_service.read().await;
+            let reason = "AI分析已禁用，使用备用分析".to_string();
             let report_for_ai = AnalysisReport {
                 stock_code: stock_code.to_string(),
                 stock_name: stock_name.clone(),
@@ -124,8 +131,11 @@ impl StockAnalyzer {
                     total_news_count: news_data.len() as i32,
                     analysis_completeness: "完整".to_string(),
                 },
+                fallback_used: true,
+                fallback_reason: Some(reason.clone()),
             };
-            ai_service.generate_fallback_analysis(&report_for_ai)
+            let fallback_analysis = ai_service.generate_fallback_analysis(&report_for_ai);
+            (fallback_analysis, true, Some(reason))
         };
 
         let report = AnalysisReport {
@@ -145,6 +155,8 @@ impl StockAnalyzer {
                 total_news_count: news_data.len() as i32,
                 analysis_completeness: "完整".to_string(),
             },
+            fallback_used,
+            fallback_reason,
         };
 
         // Save analysis to database if available
@@ -303,7 +315,7 @@ impl StockAnalyzer {
         let macd_line = short_ma - long_ma;
         
         // Calculate signal line (9-period EMA of MACD line)
-        let signal_line = self.calculate_ema(&vec![macd_line], 9);
+        let signal_line = self.calculate_ema(&[macd_line], 9);
         let macd_histogram = macd_line - signal_line;
 
         let macd_signal = if macd_line > signal_line {

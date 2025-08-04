@@ -2,10 +2,52 @@ use chrono::{DateTime, Duration, Utc};
 use reqwest::Client;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::{Duration as StdDuration, Instant};
 
 use crate::models::*;
 use crate::models::Market;
 use crate::cache::CachedDataFetcher;
+
+// Rate limiter for API calls (max 10 requests per second)
+pub struct RateLimiter {
+    request_times: Arc<tokio::sync::Mutex<Vec<Instant>>>,
+}
+
+impl RateLimiter {
+    pub fn new(_max_requests: usize) -> Self {
+        Self {
+            request_times: Arc::new(tokio::sync::Mutex::new(Vec::new())),
+        }
+    }
+
+    pub async fn acquire(&self) -> RateLimiterPermit {
+        let mut times = self.request_times.lock().await;
+        let now = Instant::now();
+        
+        // Clean up old requests (older than 1 second)
+        times.retain(|&time| now.duration_since(time) < StdDuration::from_secs(1));
+        
+        // If we have too many recent requests, wait
+        if times.len() >= 10 {
+            if let Some(&oldest_time) = times.first() {
+                let wait_time = StdDuration::from_secs(1).saturating_sub(now.duration_since(oldest_time));
+                if wait_time > StdDuration::from_millis(0) {
+                    drop(times);
+                    tokio::time::sleep(wait_time).await;
+                    times = self.request_times.lock().await;
+                }
+            }
+        }
+        
+        // Record this request time
+        times.push(now);
+        
+        RateLimiterPermit
+    }
+}
+
+pub struct RateLimiterPermit;
 
 #[async_trait::async_trait]
 pub trait DataFetcher: Send + Sync {
@@ -13,12 +55,68 @@ pub trait DataFetcher: Send + Sync {
     async fn get_fundamental_data(&self, stock_code: &str) -> Result<FundamentalData, String>;
     async fn get_news_data(&self, stock_code: &str, days: i32) -> Result<(Vec<News>, SentimentAnalysis), String>;
     async fn get_stock_name(&self, stock_code: &str) -> String;
+    
+    // New method for concurrent data fetching
+    async fn get_all_data_concurrent(&self, stock_code: &str, days: i32) -> Result<(Vec<PriceData>, FundamentalData, (Vec<News>, SentimentAnalysis), String), String> {
+        let stock_code_clone = stock_code.to_string();
+        
+        // Spawn all three requests concurrently
+        let price_future = tokio::spawn({
+            let fetcher = self.clone();
+            async move {
+                fetcher.get_stock_data(&stock_code_clone, days).await
+            }
+        });
+        
+        let fundamental_future = tokio::spawn({
+            let stock_code_clone = stock_code.to_string();
+            let fetcher = self.clone();
+            async move {
+                fetcher.get_fundamental_data(&stock_code_clone).await
+            }
+        });
+        
+        let news_future = tokio::spawn({
+            let stock_code_clone = stock_code.to_string();
+            let fetcher = self.clone();
+            async move {
+                fetcher.get_news_data(&stock_code_clone, days).await
+            }
+        });
+        
+        let name_future = tokio::spawn({
+            let stock_code_clone = stock_code.to_string();
+            let fetcher = self.clone();
+            async move {
+                fetcher.get_stock_name(&stock_code_clone).await
+            }
+        });
+        
+        // Wait for all results
+        let (price_result, fundamental_result, news_result, name_result) = tokio::join!(
+            price_future,
+            fundamental_future,
+            news_future,
+            name_future
+        );
+        
+        let price_data = price_result.map_err(|e| format!("Price task failed: {}", e))??;
+        let fundamental_data = fundamental_result.map_err(|e| format!("Fundamental task failed: {}", e))??;
+        let news_data = news_result.map_err(|e| format!("News task failed: {}", e))??;
+        let stock_name = name_result.map_err(|e| format!("Name task failed: {}", e))?;
+        
+        Ok((price_data, fundamental_data, news_data, stock_name))
+    }
+    
+    // Helper method for cloning
+    fn clone(&self) -> Box<dyn DataFetcher>;
 }
 
 pub struct AkshareProxy {
     client: Client,
     base_url: String,
     timeout: std::time::Duration,
+    rate_limiter: Arc<RateLimiter>,
 }
 
 impl AkshareProxy {
@@ -32,10 +130,14 @@ impl AkshareProxy {
             client,
             base_url,
             timeout: std::time::Duration::from_secs(timeout_secs),
+            rate_limiter: Arc::new(RateLimiter::new(10)), // Max 10 requests per second
         }
     }
 
     async fn make_request(&self, endpoint: &str) -> Result<Value, String> {
+        // Acquire rate limit permit
+        let _permit = self.rate_limiter.acquire().await;
+        
         let url = format!("{}/{}", self.base_url, endpoint);
         let response = self.client
             .get(&url)
@@ -50,6 +152,17 @@ impl AkshareProxy {
         response.json::<Value>()
             .await
             .map_err(|e| format!("JSON parse failed: {}", e))
+    }
+}
+
+impl Clone for AkshareProxy {
+    fn clone(&self) -> Self {
+        Self {
+            client: self.client.clone(),
+            base_url: self.base_url.clone(),
+            timeout: self.timeout,
+            rate_limiter: self.rate_limiter.clone(),
+        }
     }
 }
 
@@ -280,6 +393,10 @@ impl DataFetcher for AkshareProxy {
             Ok(data) => data["name"].as_str().unwrap_or("").to_string(),
             Err(_) => format!("{}股票", stock_code),
         }
+    }
+    
+    fn clone(&self) -> Box<dyn DataFetcher> {
+        Box::new(Clone::clone(self))
     }
 }
 
@@ -658,5 +775,9 @@ impl DataFetcher for MockDataFetcher {
             Market::US => format!("{} Corp.", stock_code),
             Market::UNKNOWN => format!("{}股票", stock_code),
         }
+    }
+    
+    fn clone(&self) -> Box<dyn DataFetcher> {
+        Box::new(MockDataFetcher)
     }
 }

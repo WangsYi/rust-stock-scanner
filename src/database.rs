@@ -105,17 +105,269 @@ impl Database {
     }
 
     pub async fn get_analysis_history(&self, query: &HistoryQuery) -> Result<HistoryResponse, sqlx::Error> {
-        // For now, return empty history to avoid complex query handling
-        Ok(HistoryResponse {
-            analyses: Vec::new(),
-            total: 0,
-            query: query.clone(),
-        })
+        match self {
+            Database::Sqlite(pool) => {
+                let limit = query.limit.unwrap_or(20).min(100);
+                let offset = query.offset.unwrap_or(0);
+                
+                // Get total count
+                let count_query = if let Some(ref stock_code) = query.stock_code {
+                    if stock_code.is_empty() {
+                        "SELECT COUNT(*) as total FROM saved_analyses"
+                    } else {
+                        "SELECT COUNT(*) as total FROM saved_analyses WHERE stock_code = ?1"
+                    }
+                } else {
+                    "SELECT COUNT(*) as total FROM saved_analyses"
+                };
+                
+                let total_count = if let Some(ref stock_code) = query.stock_code {
+                    if stock_code.is_empty() {
+                        sqlx::query(count_query)
+                            .fetch_one(pool)
+                            .await?
+                            .get::<i64, _>("total")
+                    } else {
+                        sqlx::query(count_query)
+                            .bind(stock_code)
+                            .fetch_one(pool)
+                            .await?
+                            .get::<i64, _>("total")
+                    }
+                } else {
+                    sqlx::query(count_query)
+                        .fetch_one(pool)
+                        .await?
+                        .get::<i64, _>("total")
+                };
+                
+                // Get paginated data
+                let (data_query, binds) = if let Some(ref stock_code) = query.stock_code {
+                    if stock_code.is_empty() {
+                        (
+                            "SELECT * FROM saved_analyses ORDER BY created_at DESC LIMIT ?1 OFFSET ?2",
+                            vec![limit.to_string(), offset.to_string()]
+                        )
+                    } else {
+                        (
+                            "SELECT * FROM saved_analyses WHERE stock_code = ?1 ORDER BY created_at DESC LIMIT ?2 OFFSET ?3",
+                            vec![stock_code.clone(), limit.to_string(), offset.to_string()]
+                        )
+                    }
+                } else {
+                    (
+                        "SELECT * FROM saved_analyses ORDER BY created_at DESC LIMIT ?1 OFFSET ?2",
+                        vec![limit.to_string(), offset.to_string()]
+                    )
+                };
+                
+                let query_builder = if binds.len() == 2 {
+                    sqlx::query(data_query)
+                        .bind(&binds[0])
+                        .bind(&binds[1])
+                } else if binds.len() == 3 {
+                    sqlx::query(data_query)
+                        .bind(&binds[0])
+                        .bind(&binds[1])
+                        .bind(&binds[2])
+                } else {
+                    sqlx::query(data_query)
+                };
+                
+                let rows = query_builder.fetch_all(pool).await?;
+                let mut analyses = Vec::new();
+                
+                for row in rows {
+                    let analysis = SavedAnalysis {
+                        id: row.get("id"),
+                        stock_code: row.get("stock_code"),
+                        stock_name: row.get("stock_name"),
+                        analysis_date: row.get("analysis_date"),
+                        price_info: serde_json::from_value(row.get("price_info")).unwrap_or_default(),
+                        technical: serde_json::from_value(row.get("technical")).unwrap_or_default(),
+                        fundamental: serde_json::from_value(row.get("fundamental")).unwrap_or_default(),
+                        sentiment: serde_json::from_value(row.get("sentiment")).unwrap_or_default(),
+                        scores: serde_json::from_value(row.get("scores")).unwrap_or_default(),
+                        recommendation: row.get("recommendation"),
+                        ai_analysis: row.get("ai_analysis"),
+                        data_quality: serde_json::from_value(row.get("data_quality")).unwrap_or_default(),
+                        ai_provider: row.get("ai_provider"),
+                        ai_model: row.get("ai_model"),
+                        created_at: row.get("created_at"),
+                    };
+                    analyses.push(analysis);
+                }
+                
+                Ok(HistoryResponse {
+                    analyses,
+                    total: total_count,
+                    query: query.clone(),
+                })
+            }
+            Database::Postgres(pool) => {
+                let limit = query.limit.unwrap_or(20).min(100);
+                let offset = query.offset.unwrap_or(0);
+                
+                // Get total count
+                let count_query = if let Some(ref stock_code) = query.stock_code {
+                    if stock_code.is_empty() {
+                        "SELECT COUNT(*) as total FROM saved_analyses"
+                    } else {
+                        "SELECT COUNT(*) as total FROM saved_analyses WHERE stock_code = $1"
+                    }
+                } else {
+                    "SELECT COUNT(*) as total FROM saved_analyses"
+                };
+                
+                let total_count = if let Some(ref stock_code) = query.stock_code {
+                    if stock_code.is_empty() {
+                        sqlx::query(count_query)
+                            .fetch_one(pool)
+                            .await?
+                            .get::<i64, _>("total")
+                    } else {
+                        sqlx::query(count_query)
+                            .bind(stock_code)
+                            .fetch_one(pool)
+                            .await?
+                            .get::<i64, _>("total")
+                    }
+                } else {
+                    sqlx::query(count_query)
+                        .fetch_one(pool)
+                        .await?
+                        .get::<i64, _>("total")
+                };
+                
+                // Get paginated data
+                let (data_query, binds) = if let Some(ref stock_code) = query.stock_code {
+                    if stock_code.is_empty() {
+                        (
+                            "SELECT * FROM saved_analyses ORDER BY created_at DESC LIMIT $1 OFFSET $2",
+                            vec![limit.to_string(), offset.to_string()]
+                        )
+                    } else {
+                        (
+                            "SELECT * FROM saved_analyses WHERE stock_code = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+                            vec![stock_code.clone(), limit.to_string(), offset.to_string()]
+                        )
+                    }
+                } else {
+                    (
+                        "SELECT * FROM saved_analyses ORDER BY created_at DESC LIMIT $1 OFFSET $2",
+                        vec![limit.to_string(), offset.to_string()]
+                    )
+                };
+                
+                let query_builder = if binds.len() == 2 {
+                    sqlx::query(data_query)
+                        .bind(&binds[0])
+                        .bind(&binds[1])
+                } else if binds.len() == 3 {
+                    sqlx::query(data_query)
+                        .bind(&binds[0])
+                        .bind(&binds[1])
+                        .bind(&binds[2])
+                } else {
+                    sqlx::query(data_query)
+                };
+                
+                let rows = query_builder.fetch_all(pool).await?;
+                let mut analyses = Vec::new();
+                
+                for row in rows {
+                    let analysis = SavedAnalysis {
+                        id: row.get("id"),
+                        stock_code: row.get("stock_code"),
+                        stock_name: row.get("stock_name"),
+                        analysis_date: row.get("analysis_date"),
+                        price_info: serde_json::from_value(row.get("price_info")).unwrap_or_default(),
+                        technical: serde_json::from_value(row.get("technical")).unwrap_or_default(),
+                        fundamental: serde_json::from_value(row.get("fundamental")).unwrap_or_default(),
+                        sentiment: serde_json::from_value(row.get("sentiment")).unwrap_or_default(),
+                        scores: serde_json::from_value(row.get("scores")).unwrap_or_default(),
+                        recommendation: row.get("recommendation"),
+                        ai_analysis: row.get("ai_analysis"),
+                        data_quality: serde_json::from_value(row.get("data_quality")).unwrap_or_default(),
+                        ai_provider: row.get("ai_provider"),
+                        ai_model: row.get("ai_model"),
+                        created_at: row.get("created_at"),
+                    };
+                    analyses.push(analysis);
+                }
+                
+                Ok(HistoryResponse {
+                    analyses,
+                    total: total_count,
+                    query: query.clone(),
+                })
+            }
+        }
     }
 
-    pub async fn get_analysis_by_id(&self, _id: Uuid) -> Result<Option<SavedAnalysis>, sqlx::Error> {
-        // For now, return None to avoid complex query handling
-        Ok(None)
+    pub async fn get_analysis_by_id(&self, id: Uuid) -> Result<Option<SavedAnalysis>, sqlx::Error> {
+        match self {
+            Database::Sqlite(pool) => {
+                let query = "SELECT * FROM saved_analyses WHERE id = ?1";
+                match sqlx::query(query)
+                    .bind(id.to_string())
+                    .fetch_optional(pool)
+                    .await?
+                {
+                    Some(row) => {
+                        let analysis = SavedAnalysis {
+                            id: row.get("id"),
+                            stock_code: row.get("stock_code"),
+                            stock_name: row.get("stock_name"),
+                            analysis_date: row.get("analysis_date"),
+                            price_info: serde_json::from_value(row.get("price_info")).unwrap_or_default(),
+                            technical: serde_json::from_value(row.get("technical")).unwrap_or_default(),
+                            fundamental: serde_json::from_value(row.get("fundamental")).unwrap_or_default(),
+                            sentiment: serde_json::from_value(row.get("sentiment")).unwrap_or_default(),
+                            scores: serde_json::from_value(row.get("scores")).unwrap_or_default(),
+                            recommendation: row.get("recommendation"),
+                            ai_analysis: row.get("ai_analysis"),
+                            data_quality: serde_json::from_value(row.get("data_quality")).unwrap_or_default(),
+                            ai_provider: row.get("ai_provider"),
+                            ai_model: row.get("ai_model"),
+                            created_at: row.get("created_at"),
+                        };
+                        Ok(Some(analysis))
+                    }
+                    None => Ok(None),
+                }
+            }
+            Database::Postgres(pool) => {
+                let query = "SELECT * FROM saved_analyses WHERE id = $1";
+                match sqlx::query(query)
+                    .bind(id)
+                    .fetch_optional(pool)
+                    .await?
+                {
+                    Some(row) => {
+                        let analysis = SavedAnalysis {
+                            id: row.get("id"),
+                            stock_code: row.get("stock_code"),
+                            stock_name: row.get("stock_name"),
+                            analysis_date: row.get("analysis_date"),
+                            price_info: serde_json::from_value(row.get("price_info")).unwrap_or_default(),
+                            technical: serde_json::from_value(row.get("technical")).unwrap_or_default(),
+                            fundamental: serde_json::from_value(row.get("fundamental")).unwrap_or_default(),
+                            sentiment: serde_json::from_value(row.get("sentiment")).unwrap_or_default(),
+                            scores: serde_json::from_value(row.get("scores")).unwrap_or_default(),
+                            recommendation: row.get("recommendation"),
+                            ai_analysis: row.get("ai_analysis"),
+                            data_quality: serde_json::from_value(row.get("data_quality")).unwrap_or_default(),
+                            ai_provider: row.get("ai_provider"),
+                            ai_model: row.get("ai_model"),
+                            created_at: row.get("created_at"),
+                        };
+                        Ok(Some(analysis))
+                    }
+                    None => Ok(None),
+                }
+            }
+        }
     }
 
     pub async fn save_configuration(&self, config_type: &str, config_name: &str, config_data: &serde_json::Value) -> Result<Uuid, sqlx::Error> {
@@ -161,7 +413,7 @@ impl Database {
         Ok(id)
     }
 
-    pub async fn get_active_configuration(&self, config_type: &str) -> Result<Option<SavedConfiguration>, sqlx::Error> {
+    pub async fn get_active_configuration(&self, _config_type: &str) -> Result<Option<SavedConfiguration>, sqlx::Error> {
         // For now, return None to avoid complex query handling
         Ok(None)
     }

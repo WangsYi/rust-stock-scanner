@@ -31,8 +31,8 @@ async fn main() -> std::io::Result<()> {
     let app_state = match AppState::new(config.clone()).await {
         Ok(state) => web::Data::new(state),
         Err(e) => {
-            log::error!("Failed to initialize application state: {}", e);
-            return Err(std::io::Error::new(std::io::ErrorKind::Other, e));
+            log::error!("Failed to initialize application state: {e}");
+            return Err(std::io::Error::other(e));
         }
     };
 

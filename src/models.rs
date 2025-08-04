@@ -179,6 +179,8 @@ pub struct AnalysisReport {
     pub recommendation: String,
     pub ai_analysis: String,
     pub data_quality: DataQuality,
+    pub fallback_used: bool,
+    pub fallback_reason: Option<String>,
 }
 
 impl Market {

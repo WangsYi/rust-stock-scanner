@@ -469,6 +469,15 @@ pub struct CachedDataFetcherWrapper<T: CachedDataFetcher> {
     cache: Arc<DataCache>,
 }
 
+impl<T: CachedDataFetcher> Clone for CachedDataFetcherWrapper<T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            cache: self.cache.clone(),
+        }
+    }
+}
+
 impl<T: CachedDataFetcher> CachedDataFetcherWrapper<T> {
     pub fn new(inner: T, cache: Arc<DataCache>) -> Self {
         Self {
@@ -479,7 +488,7 @@ impl<T: CachedDataFetcher> CachedDataFetcherWrapper<T> {
 }
 
 #[async_trait::async_trait]
-impl<T: CachedDataFetcher> DataFetcher for CachedDataFetcherWrapper<T> {
+impl<T: CachedDataFetcher + 'static> DataFetcher for CachedDataFetcherWrapper<T> {
     async fn get_stock_data(&self, stock_code: &str, days: i32) -> Result<Vec<PriceData>, String> {
         // Try cache first
         if let Some(cached_data) = self.cache.get_price_data(stock_code, days).await {
@@ -550,5 +559,12 @@ impl<T: CachedDataFetcher> DataFetcher for CachedDataFetcherWrapper<T> {
         self.cache.set_stock_name(stock_code, name.clone()).await;
         
         name
+    }
+    
+    fn clone(&self) -> Box<dyn DataFetcher> {
+        Box::new(CachedDataFetcherWrapper {
+            inner: self.inner.clone(),
+            cache: self.cache.clone(),
+        })
     }
 }

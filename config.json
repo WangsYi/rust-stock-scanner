@@ -26,6 +26,19 @@
     "max_connections": 5,
     "enable_migrations": true
   },
+  "ai": {
+    "provider": "glm",
+    "api_key": "",
+    "model": "glm-4",
+    "enabled": true,
+    "timeout_seconds": 120
+  },
+  "auth": {
+    "enabled": false,
+    "secret_key": "your-secret-key-change-this",
+    "session_timeout": 86400,
+    "bcrypt_cost": 12
+  },
   "cache": {
     "enabled": true,
     "price_data_ttl": 300,
