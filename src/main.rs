@@ -111,6 +111,7 @@ async fn main() -> std::io::Result<()> {
                     )
                     .route("/history", web::get().to(handlers::get_analysis_history))
                     .route("/history/{id}", web::get().to(handlers::get_analysis_by_id))
+                    .route("/datasource/test", web::post().to(handlers::test_datasource))
                     .service(
                         web::scope("/configurations")
                             .route("", web::post().to(handlers::save_configuration))

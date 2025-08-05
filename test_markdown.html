@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown渲染测试</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.4;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .ai-analysis-content {
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .ai-analysis-content h1 {
+            font-size: 18px;
+            color: #2c3e50;
+            margin: 20px 0 12px 0;
+            font-weight: 600;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 6px;
+        }
+        
+        .ai-analysis-content h2 {
+            font-size: 16px;
+            color: #2c3e50;
+            margin: 16px 0 10px 0;
+            font-weight: 600;
+            border-bottom: 1px solid #bdc3c7;
+            padding-bottom: 4px;
+        }
+        
+        .ai-analysis-content h3 {
+            font-size: 14px;
+            color: #2c3e50;
+            margin: 14px 0 8px 0;
+            font-weight: 600;
+        }
+        
+        .ai-analysis-content p {
+            margin-bottom: 8px;
+            text-align: justify;
+            color: #495057;
+        }
+        
+        .ai-analysis-content strong {
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        
+        .ai-analysis-content em {
+            color: #6c757d;
+            font-style: italic;
+        }
+        
+        .ai-analysis-content ul,
+        .ai-analysis-content ol {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+        
+        .ai-analysis-content li {
+            margin-bottom: 4px;
+            color: #495057;
+        }
+        
+        .ai-analysis-content code {
+            background-color: #f8f9fa;
+            color: #e83e8c;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 11px;
+        }
+        
+        .ai-analysis-content pre {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 8px;
+            margin: 8px 0;
+            overflow-x: auto;
+        }
+        
+        .ai-analysis-content pre code {
+            background: none;
+            padding: 0;
+            color: #495057;
+        }
+        
+        .ai-analysis-content blockquote {
+            border-left: 4px solid #3498db;
+            margin: 8px 0;
+            padding-left: 12px;
+            color: #6c757d;
+            font-style: italic;
+        }
+        
+        .input-area {
+            margin-bottom: 20px;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 200px;
+            padding: 10px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            resize: vertical;
+        }
+        
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
+        button:hover {
+            background-color: #2980b9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Markdown渲染测试</h1>
+        
+        <div class="input-area">
+            <h3>输入Markdown文本：</h3>
+            <textarea id="markdownInput"># 📊 000001 股票分析报告
+
+## 🏢 基本信息
+
+- **股票代码**: 000001
+- **分析时间**: 2025-08-04 12:00:00
+- **当前价格**: ¥92.69
+
+## 📈 技术分析
+
+- **均线趋势**: 多头排列
+- **RSI指标**: 45.6 (正常区域)
+- **MACD信号**: 看涨
+
+## 💰 基本面分析
+
+- **市盈率**: 15.2倍
+- **市净率**: 1.8倍
+- **财务状况**: 良好
+
+## 📰 市场情绪
+
+- **整体情绪**: 积极
+- **新闻数量**: 15条
+- **置信度**: 85%
+
+## 🎯 投资建议
+
+根据综合分析，该股票显示出良好的投资价值。技术面表现强劲，基本面稳健，市场情绪积极。建议投资者可以适当关注，但需注意市场风险。
+
+### 风险提示
+
+1. 市场波动风险
+2. 政策变化风险
+3. 个股基本面风险
+
+> 投资有风险，入市需谨慎。
+
+**代码示例**: `console.log('Hello World');`
+
+```javascript
+function calculateRSI(prices, period) {
+    // RSI计算逻辑
+    return rsiValue;
+}
+```</textarea>
+            <button onclick="renderMarkdown()">渲染Markdown</button>
+        </div>
+        
+        <div class="result-area">
+            <h3>渲染结果：</h3>
+            <div id="markdownOutput" class="ai-analysis-content">
+                <p>请在上方输入Markdown文本并点击渲染按钮</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 从原始文件复制的增强Markdown解析器
+        function enhancedMarkdownParse(text) {
+            if (!text) return '';
+            
+            let html = text;
+            
+            // Process code blocks first to avoid interference
+            html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+                return `<pre><code class="language-${lang || 'text'}">${escapeHtml(code.trim())}</code></pre>`;
+            });
+            
+            // Headers with better styling
+            html = html.replace(/^### (.*$)/gim, '<h3 id="$1">$1</h3>');
+            html = html.replace(/^## (.*$)/gim, '<h2 id="$1">$1</h2>');
+            html = html.replace(/^# (.*$)/gim, '<h1 id="$1">$1</h1>');
+            
+            // Bold text
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            
+            // Italic text
+            html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            
+            // Inline code (after code blocks to avoid interference)
+            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+            
+            // Links
+            html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+            
+            // Blockquotes
+            html = html.replace(/^> (.*$)/gim, '<blockquote>$1</blockquote>');
+            
+            // Process lists
+            const lines = html.split('\n');
+            let inList = false;
+            let listType = '';
+            let processedLines = [];
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                
+                // Check for unordered list items
+                if (/^[\-\*\+] /.test(line)) {
+                    if (!inList || listType !== 'ul') {
+                        if (inList) processedLines.push(`</${listType}>`);
+                        processedLines.push('<ul>');
+                        inList = true;
+                        listType = 'ul';
+                    }
+                    const content = line.replace(/^[\-\*\+] /, '').trim();
+                    processedLines.push(`<li>${content}</li>`);
+                }
+                // Check for ordered list items
+                else if (/^\d+\. /.test(line)) {
+                    if (!inList || listType !== 'ol') {
+                        if (inList) processedLines.push(`</${listType}>`);
+                        processedLines.push('<ol>');
+                        inList = true;
+                        listType = 'ol';
+                    }
+                    const content = line.replace(/^\d+\. /, '').trim();
+                    processedLines.push(`<li>${content}</li>`);
+                }
+                // Close list if we encounter a non-list item
+                else if (inList && line.trim() !== '') {
+                    processedLines.push(`</${listType}>`);
+                    inList = false;
+                    listType = '';
+                    processedLines.push(line);
+                }
+                else {
+                    processedLines.push(line);
+                }
+            }
+            
+            // Close any remaining list
+            if (inList) {
+                processedLines.push(`</${listType}>`);
+            }
+            
+            html = processedLines.join('\n');
+            
+            // Tables (simple format)
+            html = html.replace(/\|(.+)\|/g, (match, content) => {
+                const cells = content.split('|').map(cell => cell.trim());
+                return '<tr>' + cells.map(cell => `<td>${escapeHtml(cell)}</td>`).join('') + '</tr>';
+            });
+            
+            // Line breaks - preserve them properly
+            html = html.replace(/\n\n+/g, '</p><p>');
+            html = html.replace(/\n/g, '<br>');
+            
+            // Wrap in paragraphs, but avoid wrapping existing HTML elements
+            const parts = html.split('<br>');
+            html = parts.map(part => {
+                part = part.trim();
+                if (part && !part.match(/^<[h|d|u|o|l|b|p|t|d]/)) {
+                    return `<p>${part}</p>`;
+                }
+                return part;
+            }).join('<br>');
+            
+            return html;
+        }
+        
+        // HTML escape function
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Render markdown function
+        function renderMarkdown() {
+            const input = document.getElementById('markdownInput').value;
+            const output = document.getElementById('markdownOutput');
+            
+            if (input.trim()) {
+                const html = enhancedMarkdownParse(input);
+                output.innerHTML = html;
+            } else {
+                output.innerHTML = '<p>请在上方输入Markdown文本并点击渲染按钮</p>';
+            }
+        }
+        
+        // Auto-render on page load
+        window.onload = function() {
+            renderMarkdown();
+        };
+    </script>
+</body>
+</html>

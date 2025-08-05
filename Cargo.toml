@@ -27,3 +27,8 @@ async-trait = "0.1"
 jsonwebtoken = "9.2"
 bcrypt = "0.15"
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "postgres", "chrono", "uuid", "json"] }
+
+[build-dependencies]
+watchexec = "2.3"
+watchexec-signals = "2.1"
+watchexec-filterer-globset = "2.0"
