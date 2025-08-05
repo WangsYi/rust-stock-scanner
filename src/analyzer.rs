@@ -99,6 +99,7 @@ impl StockAnalyzer {
                     total_news_count: news_data.len() as i32,
                     analysis_completeness: "完整".to_string(),
                 },
+                strategy_analysis: None,
                 fallback_used: false,
                 fallback_reason: None,
             };
@@ -136,6 +137,7 @@ impl StockAnalyzer {
                     total_news_count: news_data.len() as i32,
                     analysis_completeness: "完整".to_string(),
                 },
+                strategy_analysis: None,
                 fallback_used: true,
                 fallback_reason: Some(reason.clone()),
             };
@@ -160,6 +162,7 @@ impl StockAnalyzer {
                 total_news_count: news_data.len() as i32,
                 analysis_completeness: "完整".to_string(),
             },
+            strategy_analysis: None,
             fallback_used,
             fallback_reason,
         };

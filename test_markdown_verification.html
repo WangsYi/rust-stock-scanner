@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Markdown rendering library -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- DOMPurify for security -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    
+    <title>Markdown库验证测试</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .markdown-content {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            background-color: #f9f9f9;
+        }
+        .markdown-content h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 5px;
+        }
+        .markdown-content h2 {
+            color: #34495e;
+            border-bottom: 1px solid #bdc3c7;
+            padding-bottom: 3px;
+        }
+        .markdown-content h3 {
+            color: #34495e;
+        }
+        .markdown-content strong {
+            color: #2c3e50;
+            font-weight: bold;
+        }
+        .markdown-content em {
+            color: #7f8c8d;
+            font-style: italic;
+        }
+        .markdown-content code {
+            background-color: #f8f9fa;
+            color: #e83e8c;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        .markdown-content pre {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .markdown-content blockquote {
+            border-left: 4px solid #3498db;
+            margin: 10px 0;
+            padding-left: 15px;
+            color: #7f8c8d;
+            font-style: italic;
+        }
+        .markdown-content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 10px 0;
+        }
+        .markdown-content th, .markdown-content td {
+            border: 1px solid #dee2e6;
+            padding: 8px;
+            text-align: left;
+        }
+        .markdown-content th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        .markdown-content ul, .markdown-content ol {
+            padding-left: 20px;
+        }
+        .markdown-content li {
+            margin: 5px 0;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .raw-markdown {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Markdown库验证测试</h1>
+        
+        <div id="libraryStatus" class="status">正在检查库加载状态...</div>
+        
+        <div class="test-section">
+            <h2>📝 基础Markdown测试</h2>
+            <button onclick="testBasicMarkdown()">测试基础Markdown</button>
+            <div id="basicTest" class="markdown-content">
+                点击按钮测试基础Markdown渲染...
+            </div>
+            <details>
+                <summary>查看原始Markdown</summary>
+                <div id="basicRaw" class="raw-markdown"></div>
+            </details>
+        </div>
+        
+        <div class="test-section">
+            <h2>🌐 API数据测试</h2>
+            <button onclick="testAPIData()">测试API数据渲染</button>
+            <div id="apiTest" class="markdown-content">
+                点击按钮测试API数据渲染...
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>🔧 复杂格式测试</h2>
+            <button onclick="testComplexMarkdown()">测试复杂格式</button>
+            <div id="complexTest" class="markdown-content">
+                点击按钮测试复杂格式渲染...
+            </div>
+            <details>
+                <summary>查看原始Markdown</summary>
+                <div id="complexRaw" class="raw-markdown"></div>
+            </details>
+        </div>
+        
+        <div class="test-section">
+            <h2>📊 测试结果</h2>
+            <div id="testResults">
+                等待测试...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 检查库是否正确加载
+        function checkLibraries() {
+            const status = document.getElementById('libraryStatus');
+            
+            if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
+                status.innerHTML = '✅ marked.js 和 DOMPurify 库加载成功！';
+                status.className = 'status success';
+                
+                // 显示库版本信息
+                const results = document.getElementById('testResults');
+                results.innerHTML = `
+                    <div class="success">
+                        <h3>库加载成功</h3>
+                        <p><strong>marked.js版本:</strong> ${marked.version || '未知'}</p>
+                        <p><strong>DOMPurify版本:</strong> ${DOMPurify.version || '未知'}</p>
+                        <p><strong>测试时间:</strong> ${new Date().toLocaleString()}</p>
+                    </div>
+                `;
+            } else {
+                status.innerHTML = '❌ 库加载失败，请检查网络连接';
+                status.className = 'status error';
+                
+                const results = document.getElementById('testResults');
+                results.innerHTML = `
+                    <div class="error">
+                        <h3>库加载失败</h3>
+                        <p><strong>marked.js状态:</strong> ${typeof marked}</p>
+                        <p><strong>DOMPurify状态:</strong> ${typeof DOMPurify}</p>
+                        <p>请检查CDN链接和网络连接。</p>
+                    </div>
+                `;
+            }
+        }
+        
+        // Markdown parser using marked.js library
+        function enhancedMarkdownParse(text) {
+            if (!text) return '';
+            
+            // Configure marked options for better compatibility
+            marked.setOptions({
+                breaks: true,
+                gfm: true,
+                headerIds: false,
+                mangle: false,
+                sanitize: false,
+                smartLists: true,
+                smartypants: true
+            });
+            
+            // Parse markdown and sanitize HTML
+            const rawHtml = marked.parse(text);
+            const cleanHtml = DOMPurify.sanitize(rawHtml);
+            
+            return cleanHtml;
+        }
+        
+        // 测试基础markdown
+        function testBasicMarkdown() {
+            const testElement = document.getElementById('basicTest');
+            const rawElement = document.getElementById('basicRaw');
+            
+            const markdownText = `# 一级标题
+
+## 二级标题
+
+### 三级标题
+
+这是一个**粗体文本**和*斜体文本*的示例。
+
+这是一个行内代码：\`console.log('Hello World')\`
+
+> 这是一个引用文本的示例。
+
+- 无序列表项1
+- 无序列表项2
+- 无序列表项3
+
+1. 有序列表项1
+2. 有序列表项2
+3. 有序列表项3
+
+这是一个[链接示例](https://www.example.com)。`;
+
+            rawElement.textContent = markdownText;
+            const parsedHtml = enhancedMarkdownParse(markdownText);
+            testElement.innerHTML = parsedHtml;
+            
+            console.log('基础Markdown测试完成');
+        }
+        
+        // 测试API数据
+        async function testAPIData() {
+            const testElement = document.getElementById('apiTest');
+            testElement.innerHTML = '正在加载API数据...';
+            
+            try {
+                const response = await fetch('http://localhost:8080/api/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        stock_code: '000001',
+                        enable_ai: false
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const aiAnalysis = result.data.ai_analysis;
+                    const parsedHtml = enhancedMarkdownParse(aiAnalysis);
+                    testElement.innerHTML = parsedHtml;
+                    
+                    console.log('API数据测试完成');
+                } else {
+                    testElement.innerHTML = `<p style="color: red;">API调用失败: ${result.error}</p>`;
+                }
+            } catch (error) {
+                testElement.innerHTML = `<p style="color: red;">请求失败: ${error.message}</p>`;
+            }
+        }
+        
+        // 测试复杂格式
+        function testComplexMarkdown() {
+            const testElement = document.getElementById('complexTest');
+            const rawElement = document.getElementById('complexRaw');
+            
+            const markdownText = `# 复杂格式测试
+
+## 表格测试
+
+| 列1 | 列2 | 列3 |
+|-----|-----|-----|
+| 数据1 | 数据2 | 数据3 |
+| 数据4 | 数据5 | 数据6 |
+| 数据7 | 数据8 | 数据9 |
+
+## 代码块测试
+
+\`\`\`javascript
+function calculateRSI(prices, period = 14) {
+    let gains = 0;
+    let losses = 0;
+    
+    for (let i = 1; i < prices.length; i++) {
+        const change = prices[i] - prices[i - 1];
+        if (change > 0) {
+            gains += change;
+        } else {
+            losses += Math.abs(change);
+        }
+    }
+    
+    const avgGain = gains / period;
+    const avgLoss = losses / period;
+    const rs = avgGain / avgLoss;
+    
+    return 100 - (100 / (1 + rs));
+}
+\`\`\`
+
+## 混合格式测试
+
+这是一个包含**粗体**、*斜体*、\`行内代码\`和[链接](https://example.com)的段落。
+
+### 嵌套列表测试
+
+1. 一级列表项1
+   - 二级列表项1
+   - 二级列表项2
+2. 一级列表项2
+   - 二级列表项3
+   - 二级列表项4
+
+> 引用中的**粗体文本**
+> 
+> > 嵌套引用中的*斜体文本*
+
+## 数学公式测试
+
+简单的数学公式：E = mc²
+
+## 水平线测试
+
+---
+
+以上就是复杂格式的测试内容。`;
+
+            rawElement.textContent = markdownText;
+            const parsedHtml = enhancedMarkdownParse(markdownText);
+            testElement.innerHTML = parsedHtml;
+            
+            console.log('复杂格式测试完成');
+        }
+        
+        // 页面加载完成后检查库状态
+        window.addEventListener('load', checkLibraries);
+    </script>
+</body>
+</html>

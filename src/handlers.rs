@@ -10,10 +10,13 @@ use crate::ai_service::{get_ai_providers_info, AIService};
 use crate::analyzer::StockAnalyzer;
 use crate::auth::AuthService;
 use crate::cache::{CachedDataFetcherWrapper, DataCache};
+use crate::chip_monitor::ChipMonitor;
 use crate::currency::{CurrencyConverter, MarketTimeInfo};
 use crate::data_fetcher::{AkshareProxy, DataFetcher};
 use crate::database::Database;
 use crate::models::*;
+use crate::signal_alerts::SignalAlertSystem;
+use crate::trading_strategies::TradingStrategiesAnalyzer;
 use async_stream::stream;
 
 pub struct AppState {
@@ -26,6 +29,9 @@ pub struct AppState {
     pub database: Arc<Database>,
     pub cache: Arc<DataCache>,
     pub currency_converter: Arc<CurrencyConverter>,
+    pub chip_monitor: Arc<ChipMonitor>,
+    pub trading_strategies_analyzer: Arc<TradingStrategiesAnalyzer>,
+    pub signal_alert_system: Arc<tokio::sync::RwLock<SignalAlertSystem>>,
 }
 
 impl AppState {
@@ -102,6 +108,15 @@ impl AppState {
 
         // Initialize currency converter
         let currency_converter = Arc::new(CurrencyConverter::new("USD".to_string(), 3600));
+        
+        // Initialize chip monitor
+        let chip_monitor = Arc::new(ChipMonitor::new());
+        
+        // Initialize trading strategies analyzer
+        let trading_strategies_analyzer = Arc::new(TradingStrategiesAnalyzer::new());
+        
+        // Initialize signal alert system
+        let signal_alert_system = Arc::new(tokio::sync::RwLock::new(SignalAlertSystem::new()));
 
         Ok(Self {
             analyzer,
@@ -113,6 +128,9 @@ impl AppState {
             database,
             cache,
             currency_converter,
+            chip_monitor,
+            trading_strategies_analyzer,
+            signal_alert_system,
         })
     }
 }
@@ -849,6 +867,192 @@ pub async fn delete_configuration(
             ))),
         ),
     }
+}
+
+// 筹码监控和策略分析相关端点
+pub async fn get_chip_analysis(
+    path: web::Path<String>,
+    state: web::Data<AppState>,
+) -> Result<HttpResponse, Error> {
+    let stock_code = path.into_inner();
+    
+    // 获取价格数据
+    match state
+        .analyzer
+        .data_fetcher()
+        .get_stock_data(&stock_code, 60)
+        .await
+    {
+        Ok(price_data) => {
+            // 分析筹码分布
+            match state.chip_monitor.analyze_chips(&stock_code, &price_data).await {
+                Ok(chip_analysis) => Ok(HttpResponse::Ok().json(ApiResponse::success(chip_analysis))),
+                Err(e) => Ok(HttpResponse::InternalServerError().json(
+                    ApiResponse::<ChipAnalysis>::error(format!("Failed to analyze chips: {}", e)),
+                )),
+            }
+        }
+        Err(e) => Ok(HttpResponse::InternalServerError().json(
+            ApiResponse::<ChipAnalysis>::error(format!("Failed to get price data: {}", e)),
+        )),
+    }
+}
+
+pub async fn get_strategies_analysis(
+    path: web::Path<String>,
+    state: web::Data<AppState>,
+) -> Result<HttpResponse, Error> {
+    let stock_code = path.into_inner();
+    
+    // 获取价格数据
+    match state
+        .analyzer
+        .data_fetcher()
+        .get_stock_data(&stock_code, 60)
+        .await
+    {
+        Ok(price_data) => {
+            // 分析交易策略
+            match state
+                .trading_strategies_analyzer
+                .analyze_all_strategies(&stock_code, &price_data)
+                .await
+            {
+                Ok(trading_strategies) => {
+                    Ok(HttpResponse::Ok().json(ApiResponse::success(trading_strategies)))
+                }
+                Err(e) => Ok(HttpResponse::InternalServerError().json(
+                    ApiResponse::<TradingStrategies>::error(format!("Failed to analyze strategies: {}", e)),
+                )),
+            }
+        }
+        Err(e) => Ok(HttpResponse::InternalServerError().json(
+            ApiResponse::<TradingStrategies>::error(format!("Failed to get price data: {}", e)),
+        )),
+    }
+}
+
+pub async fn generate_trading_signals(
+    path: web::Path<String>,
+    state: web::Data<AppState>,
+) -> Result<HttpResponse, Error> {
+    let stock_code = path.into_inner();
+    
+    // 获取价格数据和股票名称
+    let price_data = match state
+        .analyzer
+        .data_fetcher()
+        .get_stock_data(&stock_code, 60)
+        .await
+    {
+        Ok(data) => data,
+        Err(e) => {
+            return Ok(HttpResponse::InternalServerError().json(
+                ApiResponse::<Vec<TradingSignal>>::error(format!("Failed to get price data: {}", e)),
+            ))
+        }
+    };
+    
+    let stock_name = state
+        .analyzer
+        .data_fetcher()
+        .get_stock_name(&stock_code)
+        .await;
+    
+    if price_data.is_empty() {
+        return Ok(HttpResponse::BadRequest().json(
+            ApiResponse::<Vec<TradingSignal>>::error("No price data available".to_string()),
+        ));
+    }
+    
+    let current_price = price_data.last().unwrap().close;
+    
+    // 分析筹码和策略
+    let chip_analysis = match state.chip_monitor.analyze_chips(&stock_code, &price_data).await {
+        Ok(analysis) => analysis,
+        Err(e) => {
+            return Ok(HttpResponse::InternalServerError().json(
+                ApiResponse::<Vec<TradingSignal>>::error(format!("Failed to analyze chips: {}", e)),
+            ))
+        }
+    };
+    
+    let trading_strategies = match state
+        .trading_strategies_analyzer
+        .analyze_all_strategies(&stock_code, &price_data)
+        .await
+    {
+        Ok(strategies) => strategies,
+        Err(e) => {
+            return Ok(HttpResponse::InternalServerError().json(
+                ApiResponse::<Vec<TradingSignal>>::error(format!("Failed to analyze strategies: {}", e)),
+            ))
+        }
+    };
+    
+    // 生成交易信号
+    let signals = state
+        .trading_strategies_analyzer
+        .generate_trading_signals(&trading_strategies, current_price);
+    
+    // 处理信号并生成提醒
+    let mut signal_system = state.signal_alert_system.write().await;
+    let alerts = signal_system
+        .process_trading_signals(&stock_code, &stock_name, signals.clone(), current_price)
+        .await;
+    
+    // 生成完整的策略分析报告
+    let strategy_analysis = signal_system.generate_strategy_analysis_report(
+        &stock_code,
+        &stock_name,
+        &chip_analysis,
+        &trading_strategies,
+        &signals,
+    );
+    
+    Ok(HttpResponse::Ok().json(ApiResponse::success(strategy_analysis)))
+}
+
+pub async fn get_active_alerts(state: web::Data<AppState>) -> Result<HttpResponse, Error> {
+    let signal_system = state.signal_alert_system.read().await;
+    let alerts = signal_system.get_active_alerts();
+    
+    Ok(HttpResponse::Ok().json(ApiResponse::success(alerts)))
+}
+
+pub async fn get_stock_alerts(
+    path: web::Path<String>,
+    state: web::Data<AppState>,
+) -> Result<HttpResponse, Error> {
+    let stock_code = path.into_inner();
+    let signal_system = state.signal_alert_system.read().await;
+    let alerts = signal_system.get_stock_alerts(&stock_code);
+    
+    Ok(HttpResponse::Ok().json(ApiResponse::success(alerts)))
+}
+
+pub async fn cancel_alert(
+    path: web::Path<String>,
+    state: web::Data<AppState>,
+) -> Result<HttpResponse, Error> {
+    let alert_id = path.into_inner();
+    let mut signal_system = state.signal_alert_system.write().await;
+    
+    match signal_system.cancel_alert(&alert_id) {
+        Ok(_) => Ok(HttpResponse::Ok().json(ApiResponse::success("Alert cancelled successfully"))),
+        Err(e) => Ok(HttpResponse::BadRequest().json(ApiResponse::<String>::error(e))),
+    }
+}
+
+pub async fn get_signal_statistics(
+    path: web::Path<String>,
+    state: web::Data<AppState>,
+) -> Result<HttpResponse, Error> {
+    let stock_code = path.into_inner();
+    let signal_system = state.signal_alert_system.read().await;
+    let statistics = signal_system.get_signal_statistics(&stock_code);
+    
+    Ok(HttpResponse::Ok().json(ApiResponse::success(statistics)))
 }
 
 // Helper function to load config

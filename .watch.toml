@@ -1,0 +1,6 @@
+[hooks]
+run-post = "echo '🔄 Restarting server...'"
+
+[watch]
+extensions = ["html", "css", "js", "rs"]
+ignore = ["target/**", "*.md"]

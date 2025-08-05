@@ -1,0 +1,10 @@
+[build]
+rustflags = []
+
+# [target.'cfg(target_os = "linux")']
+# runner = "sudo -E"
+
+[alias]
+dev = "run --bin dev"
+# Note: 'watch' alias removed to avoid conflict with cargo-watch
+# Use 'cargo watch -x run' directly for file watching

@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Markdown rendering library -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- DOMPurify for security -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    
+    <title>Markdown库测试</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+        }
+        .ai-analysis-content h1 {
+            font-size: 18px;
+            color: #2c3e50;
+            margin: 20px 0 12px 0;
+            font-weight: 600;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 6px;
+        }
+        .ai-analysis-content h2 {
+            font-size: 16px;
+            color: #2c3e50;
+            margin: 16px 0 10px 0;
+            font-weight: 600;
+            border-bottom: 1px solid #bdc3c7;
+            padding-bottom: 4px;
+        }
+        .ai-analysis-content h3 {
+            font-size: 14px;
+            color: #2c3e50;
+            margin: 14px 0 8px 0;
+            font-weight: 600;
+        }
+        .ai-analysis-content p {
+            margin-bottom: 8px;
+            text-align: justify;
+            color: #495057;
+        }
+        .ai-analysis-content strong {
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        .ai-analysis-content em {
+            color: #6c757d;
+            font-style: italic;
+        }
+        .ai-analysis-content ul,
+        .ai-analysis-content ol {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+        .ai-analysis-content li {
+            margin-bottom: 4px;
+            color: #495057;
+        }
+        .ai-analysis-content code {
+            background-color: #f8f9fa;
+            color: #e83e8c;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 11px;
+        }
+        .ai-analysis-content pre {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 8px;
+            margin: 8px 0;
+            overflow-x: auto;
+        }
+        .ai-analysis-content pre code {
+            background: none;
+            padding: 0;
+            color: #495057;
+        }
+        .ai-analysis-content blockquote {
+            border-left: 4px solid #3498db;
+            margin: 8px 0;
+            padding-left: 12px;
+            color: #6c757d;
+            font-style: italic;
+        }
+        .ai-analysis-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8px 0;
+            font-size: 12px;
+        }
+        .ai-analysis-content th,
+        .ai-analysis-content td {
+            border: 1px solid #dee2e6;
+            padding: 6px 8px;
+            text-align: left;
+        }
+        .ai-analysis-content th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        .ai-analysis-content tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        .ai-analysis-content a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        .ai-analysis-content a:hover {
+            text-decoration: underline;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Markdown库集成测试</h1>
+        
+        <div id="libraryStatus" class="status">正在检查库加载状态...</div>
+        
+        <div class="test-section">
+            <h2>基本Markdown测试</h2>
+            <div id="basicTest" class="ai-analysis-content">
+                # 标题1
+                ## 标题2
+                ### 标题3
+                
+                **粗体文本** 和 *斜体文本*
+                
+                `行内代码`
+                
+                > 引用文本
+                
+                - 无序列表项1
+                - 无序列表项2
+                
+                1. 有序列表项1
+                2. 有序列表项2
+                
+                [链接](https://example.com)
+                
+                | 表格 | 列1 | 列2 |
+                |------|-----|-----|
+                | 行1  | 数据1 | 数据2 |
+                
+                ```javascript
+                function test() {
+                    console.log("代码块");
+                }
+                ```
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>API数据测试</h2>
+            <button onclick="loadAPIData()">加载API数据测试</button>
+            <div id="apiTest" class="ai-analysis-content">
+                点击按钮加载API数据进行测试...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 检查库是否正确加载
+        function checkLibraries() {
+            const status = document.getElementById('libraryStatus');
+            
+            if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
+                status.innerHTML = '✅ marked.js 和 DOMPurify 库加载成功！';
+                status.className = 'status success';
+                
+                // 测试基本markdown解析
+                testBasicMarkdown();
+            } else {
+                status.innerHTML = '❌ 库加载失败，请检查网络连接';
+                status.className = 'status error';
+            }
+        }
+        
+        // Markdown parser using marked.js library
+        function enhancedMarkdownParse(text) {
+            if (!text) return '';
+            
+            // Configure marked options for better compatibility
+            marked.setOptions({
+                breaks: true,
+                gfm: true,
+                headerIds: false,
+                mangle: false,
+                sanitize: false,
+                smartLists: true,
+                smartypants: true
+            });
+            
+            // Parse markdown and sanitize HTML
+            const rawHtml = marked.parse(text);
+            const cleanHtml = DOMPurify.sanitize(rawHtml);
+            
+            return cleanHtml;
+        }
+        
+        // 测试基本markdown解析
+        function testBasicMarkdown() {
+            const testElement = document.getElementById('basicTest');
+            const markdownText = testElement.textContent;
+            
+            const parsedHtml = enhancedMarkdownParse(markdownText);
+            testElement.innerHTML = parsedHtml;
+            
+            console.log('基本Markdown测试完成');
+        }
+        
+        // 加载API数据测试
+        async function loadAPIData() {
+            const apiTest = document.getElementById('apiTest');
+            apiTest.innerHTML = '正在加载API数据...';
+            
+            try {
+                const response = await fetch('http://localhost:8080/api/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        stock_code: '000001',
+                        enable_ai: false
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const aiAnalysis = result.data.ai_analysis;
+                    const parsedHtml = enhancedMarkdownParse(aiAnalysis);
+                    apiTest.innerHTML = parsedHtml;
+                    
+                    console.log('API数据测试完成');
+                } else {
+                    apiTest.innerHTML = `<p style="color: red;">API调用失败: ${result.error}</p>`;
+                }
+            } catch (error) {
+                apiTest.innerHTML = `<p style="color: red;">请求失败: ${error.message}</p>`;
+            }
+        }
+        
+        // 页面加载完成后检查库状态
+        window.addEventListener('load', checkLibraries);
+    </script>
+</body>
+</html>

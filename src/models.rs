@@ -179,6 +179,7 @@ pub struct AnalysisReport {
     pub recommendation: String,
     pub ai_analysis: String,
     pub data_quality: DataQuality,
+    pub strategy_analysis: Option<StrategyAnalysis>, // 新增策略分析
     pub fallback_used: bool,
     pub fallback_reason: Option<String>,
 }
@@ -785,4 +786,172 @@ pub struct ExchangeRateResponse {
     pub to_currency: String,
     pub rate: f64,
     pub timestamp: DateTime<Utc>,
+}
+
+// 主力筹码监控相关数据结构
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChipDistribution {
+    pub price_range: String,      // 价格区间
+    pub chip_percentage: f64,     // 筹码占比
+    pub volume: i64,              // 成交量
+    pub turnover_rate: f64,      // 换手率
+    pub avg_cost: f64,            // 平均成本
+    pub concentration: f64,       // 集中度
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CapitalFlow {
+    pub main_force_inflow: f64,   // 主力资金流入
+    pub main_force_outflow: f64,  // 主力资金流出
+    pub retail_inflow: f64,       // 散户资金流入
+    pub retail_outflow: f64,      // 散户资金流出
+    pub net_inflow: f64,          // 净流入
+    pub inflow_trend: String,     // 流入趋势
+    pub concentration_index: f64, // 资金集中度指数
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChipAnalysis {
+    pub distribution: Vec<ChipDistribution>,     // 筹码分布
+    pub capital_flow: CapitalFlow,              // 资金流向
+    pub average_cost: f64,                       // 平均持仓成本
+    pub profit_ratio: f64,                       // 盈利比例
+    pub loss_ratio: f64,                         // 亏损比例
+    pub concentration_degree: f64,              // 筹码集中度
+    pub chip_signal: String,                     // 筹码信号
+    pub support_level: f64,                      // 支撑位
+    pub resistance_level: f64,                  // 阻力位
+}
+
+// 交易策略相关数据结构
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TradingSignal {
+    pub strategy_name: String,      // 策略名称
+    pub signal_type: String,       // 信号类型: "买入", "卖出", "持有"
+    pub strength: f64,             // 信号强度 (0-100)
+    pub price: f64,                // 信号价格
+    pub timestamp: DateTime<Utc>,   // 信号时间
+    pub reason: String,             // 信号原因
+    pub confidence: f64,           // 置信度 (0-100)
+    pub risk_level: String,        // 风险等级
+    pub expected_profit: f64,      // 预期盈利
+    pub stop_loss: f64,            // 止损位
+    pub take_profit: f64,          // 止盈位
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StrategyConfig {
+    pub name: String,              // 策略名称
+    pub enabled: bool,             // 是否启用
+    pub parameters: serde_json::Value, // 策略参数
+    pub risk_tolerance: f64,       // 风险容忍度
+    pub max_position: f64,         // 最大仓位
+    pub stop_loss_ratio: f64,     // 止损比例
+    pub take_profit_ratio: f64,    // 止盈比例
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MACDStrategy {
+    pub fast_period: i32,          // 快线周期
+    pub slow_period: i32,          // 慢线周期
+    pub signal_period: i32,        // 信号线周期
+    pub current_macd: f64,         // 当前MACD值
+    pub current_signal: f64,       // 当前信号线值
+    pub histogram: f64,            // 当前柱状图值
+    pub signal_type: String,        // 信号类型
+    pub divergence: bool,          // 是否背离
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RSIStrategy {
+    pub period: i32,               // 计算周期
+    pub current_rsi: f64,          // 当前RSI值
+    pub overbought: f64,           // 超买线
+    pub oversold: f64,             // 超卖线
+    pub signal_type: String,       // 信号类型
+    pub divergence: bool,          // 是否背离
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MovingAverageStrategy {
+    pub short_period: i32,         // 短期均线周期
+    pub long_period: i32,          // 长期均线周期
+    pub short_ma: f64,             // 短期均线值
+    pub long_ma: f64,              // 长期均线值
+    pub signal_type: String,       // 信号类型
+    pub golden_cross: bool,        // 是否金叉
+    pub death_cross: bool,         // 是否死叉
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TradingStrategies {
+    pub macd: MACDStrategy,        // MACD策略
+    pub rsi: RSIStrategy,          // RSI策略
+    pub moving_average: MovingAverageStrategy, // 均线策略
+    pub bollinger_bands: BollingerBandsStrategy, // 布林带策略
+    pub kline_patterns: KlinePatternsStrategy,   // K线形态策略
+    pub volume_analysis: VolumeAnalysisStrategy, // 成交量分析策略
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BollingerBandsStrategy {
+    pub period: i32,               // 计算周期
+    pub std_dev: f64,              // 标准差倍数
+    pub upper_band: f64,           // 上轨
+    pub middle_band: f64,          // 中轨
+    pub lower_band: f64,           // 下轨
+    pub bandwidth: f64,            // 带宽
+    pub signal_type: String,       // 信号类型
+    pub squeeze: bool,              // 是否挤压
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KlinePatternsStrategy {
+    pub patterns: Vec<String>,     // 识别到的形态
+    pub reversal_patterns: Vec<String>, // 反转形态
+    pub continuation_patterns: Vec<String>, // 持续形态
+    pub signal_type: String,       // 信号类型
+    pub reliability: f64,         // 可靠性评分
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VolumeAnalysisStrategy {
+    pub volume_ratio: f64,         // 成交量比率
+    pub volume_trend: String,      // 成交量趋势
+    pub money_flow_index: f64,     // 资金流量指数
+    pub accumulation_distribution: f64, // 累积/派发线
+    pub signal_type: String,       // 信号类型
+    pub breakouts: bool,           // 是否突破
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SignalAlert {
+    pub id: String,                // 唯一标识
+    pub stock_code: String,        // 股票代码
+    pub stock_name: String,        // 股票名称
+    pub signal_type: String,       // 信号类型
+    pub signal_strength: f64,      // 信号强度
+    pub price: f64,                // 当前价格
+    pub target_price: f64,         // 目标价格
+    pub stop_loss: f64,            // 止损价格
+    pub strategy_name: String,      // 策略名称
+    pub reason: String,            // 信号原因
+    pub confidence: f64,           // 置信度
+    pub created_at: DateTime<Utc>, // 创建时间
+    pub expires_at: DateTime<Utc>,  // 过期时间
+    pub is_active: bool,           // 是否激活
+    pub notification_sent: bool,   // 通知已发送
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StrategyAnalysis {
+    pub chip_analysis: ChipAnalysis,                    // 筹码分析
+    pub trading_strategies: TradingStrategies,          // 交易策略
+    pub signals: Vec<TradingSignal>,                    // 交易信号
+    pub alerts: Vec<SignalAlert>,                       // 信号提醒
+    pub overall_signal: String,                          // 整体信号
+    pub recommendation: String,                         // 操作建议
+    pub risk_assessment: String,                        // 风险评估
+    pub market_sentiment: String,                       // 市场情绪
+    pub execution_plan: String,                         // 执行计划
 }

@@ -7,11 +7,14 @@ mod ai_service;
 mod analyzer;
 mod auth;
 mod cache;
+mod chip_monitor;
 mod currency;
 mod data_fetcher;
 mod database;
 mod handlers;
 mod models;
+mod signal_alerts;
+mod trading_strategies;
 
 use crate::handlers::AppState;
 use crate::models::AppConfig;
@@ -112,6 +115,14 @@ async fn main() -> std::io::Result<()> {
                     .route("/history", web::get().to(handlers::get_analysis_history))
                     .route("/history/{id}", web::get().to(handlers::get_analysis_by_id))
                     .route("/datasource/test", web::post().to(handlers::test_datasource))
+                    // 筹码监控和策略分析端点
+                    .route("/chip/analysis/{stock_code}", web::get().to(handlers::get_chip_analysis))
+                    .route("/strategies/analysis/{stock_code}", web::get().to(handlers::get_strategies_analysis))
+                    .route("/signals/generate/{stock_code}", web::post().to(handlers::generate_trading_signals))
+                    .route("/alerts", web::get().to(handlers::get_active_alerts))
+                    .route("/alerts/{stock_code}", web::get().to(handlers::get_stock_alerts))
+                    .route("/alerts/{alert_id}/cancel", web::post().to(handlers::cancel_alert))
+                    .route("/alerts/statistics/{stock_code}", web::get().to(handlers::get_signal_statistics))
                     .service(
                         web::scope("/configurations")
                             .route("", web::post().to(handlers::save_configuration))

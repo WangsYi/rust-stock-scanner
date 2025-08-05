@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Markdown rendering library -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- DOMPurify for security -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    
+    <title>股票分析系统 - Markdown渲染测试</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.4;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-section {
+            background-color: white;
+            border: 1px solid #bdc3c7;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        h2 {
+            color: #34495e;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #ecf0f1;
+            padding-bottom: 5px;
+        }
+        textarea {
+            width: 100%;
+            height: 300px;
+            padding: 10px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            resize: vertical;
+            margin-bottom: 10px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .result {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #bdc3c7;
+        }
+        .tab {
+            padding: 8px 16px;
+            cursor: pointer;
+            background-color: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            font-size: 13px;
+            font-weight: 500;
+            color: #2c3e50;
+            transition: all 0.2s ease;
+        }
+        .tab:hover {
+            background-color: #d5dbdb;
+        }
+        .tab.active {
+            background-color: white;
+            border-bottom-color: #3498db;
+            color: #3498db;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .api-test {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .api-test input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        
+        /* Markdown styles - copy from main application */
+        .ai-analysis-content h1 {
+            font-size: 18px;
+            color: #2c3e50;
+            margin: 20px 0 12px 0;
+            font-weight: 600;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 6px;
+        }
+        .ai-analysis-content h2 {
+            font-size: 16px;
+            color: #2c3e50;
+            margin: 16px 0 10px 0;
+            font-weight: 600;
+            border-bottom: 1px solid #bdc3c7;
+            padding-bottom: 4px;
+        }
+        .ai-analysis-content h3 {
+            font-size: 14px;
+            color: #2c3e50;
+            margin: 14px 0 8px 0;
+            font-weight: 600;
+        }
+        .ai-analysis-content p {
+            margin-bottom: 8px;
+            text-align: justify;
+            color: #495057;
+        }
+        .ai-analysis-content strong {
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        .ai-analysis-content em {
+            color: #6c757d;
+            font-style: italic;
+        }
+        .ai-analysis-content ul,
+        .ai-analysis-content ol {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+        .ai-analysis-content li {
+            margin-bottom: 4px;
+            color: #495057;
+        }
+        .ai-analysis-content code {
+            background-color: #f8f9fa;
+            color: #e83e8c;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 11px;
+        }
+        .ai-analysis-content pre {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 8px;
+            margin: 8px 0;
+            overflow-x: auto;
+        }
+        .ai-analysis-content pre code {
+            background: none;
+            padding: 0;
+            color: #495057;
+        }
+        .ai-analysis-content blockquote {
+            border-left: 4px solid #3498db;
+            margin: 8px 0;
+            padding-left: 12px;
+            color: #6c757d;
+            font-style: italic;
+        }
+        .ai-analysis-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8px 0;
+            font-size: 12px;
+        }
+        .ai-analysis-content th,
+        .ai-analysis-content td {
+            border: 1px solid #dee2e6;
+            padding: 6px 8px;
+            text-align: left;
+        }
+        .ai-analysis-content th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        .ai-analysis-content tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        .ai-analysis-content a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        .ai-analysis-content a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Markdown渲染测试页面</h1>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('manual')">手动测试</button>
+            <button class="tab" onclick="switchTab('api')">API测试</button>
+            <button class="tab" onclick="switchTab('real')">真实数据测试</button>
+        </div>
+        
+        <!-- Manual Test Tab -->
+        <div id="manual" class="tab-content active">
+            <div class="test-section">
+                <h2>手动Markdown测试</h2>
+                <textarea id="manualInput"># 📈 股票分析报告
+
+## 🏢 基本信息
+
+- **股票代码**: 000001
+- **分析时间**: 2025-08-04 12:00:00
+- **当前价格**: ¥92.69
+
+## 📊 技术分析
+
+1. **均线趋势**: 多头排列
+2. **RSI指标**: 45.6 (正常区域)
+3. **MACD信号**: 看涨
+
+## 💰 基本面分析
+
+| 指标 | 值 | 评级 |
+|------|-----|------|
+| 市盈率 | 15.2倍 | 良好 |
+| 市净率 | 1.8倍 | 优秀 |
+
+> 投资有风险，入市需谨慎。
+
+**代码示例**: `console.log('Hello World');`
+
+```javascript
+function calculateRSI(prices, period) {
+    // RSI计算逻辑
+    return rsiValue;
+}
+```
+
+这是一个[链接](https://example.com)的示例。</textarea>
+                <button onclick="testManualMarkdown()">测试Markdown解析</button>
+                <div class="result">
+                    <h3>解析结果：</h3>
+                    <div id="manualOutput" class="ai-analysis-content">
+                        点击上方按钮测试Markdown解析功能
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- API Test Tab -->
+        <div id="api" class="tab-content">
+            <div class="test-section">
+                <h2>API接口测试</h2>
+                <div class="api-test">
+                    <input type="text" id="stockCode" placeholder="股票代码 (例如: 000001)" value="000001">
+                    <button onclick="testAPI()">测试API</button>
+                    <button onclick="testAPIWithAI()">测试AI分析</button>
+                </div>
+                <div class="result">
+                    <h3>API响应：</h3>
+                    <div id="apiOutput">
+                        点击上方按钮测试API接口
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Real Data Test Tab -->
+        <div id="real" class="tab-content">
+            <div class="test-section">
+                <h2>真实数据测试</h2>
+                <button onclick="loadRealData()">加载真实分析数据</button>
+                <div class="result">
+                    <h3>真实数据渲染结果：</h3>
+                    <div id="realOutput" class="ai-analysis-content">
+                        点击上方按钮加载真实数据
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Markdown parser using marked.js library
+        function enhancedMarkdownParse(text) {
+            if (!text) return '';
+            
+            // Configure marked options for better compatibility
+            marked.setOptions({
+                breaks: true,
+                gfm: true,
+                headerIds: false,
+                mangle: false,
+                sanitize: false,
+                smartLists: true,
+                smartypants: true
+            });
+            
+            // Parse markdown and sanitize HTML
+            const rawHtml = marked.parse(text);
+            const cleanHtml = DOMPurify.sanitize(rawHtml);
+            
+            return cleanHtml;
+        }
+        
+        // Tab switching
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Update content visibility
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+        }
+        
+        // Manual markdown test
+        function testManualMarkdown() {
+            const input = document.getElementById('manualInput').value;
+            const output = document.getElementById('manualOutput');
+            
+            console.log('Original markdown:', input);
+            
+            const parsedHtml = enhancedMarkdownParse(input);
+            console.log('Parsed HTML:', parsedHtml);
+            
+            output.innerHTML = parsedHtml;
+        }
+        
+        // API test
+        async function testAPI() {
+            const stockCode = document.getElementById('stockCode').value;
+            const output = document.getElementById('apiOutput');
+            
+            try {
+                const response = await fetch('http://localhost:8080/api/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        stock_code: stockCode,
+                        enable_ai: false
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    output.innerHTML = `
+                        <h4>API调用成功</h4>
+                        <p><strong>股票代码:</strong> ${result.data.stock_code}</p>
+                        <p><strong>股票名称:</strong> ${result.data.stock_name}</p>
+                        <p><strong>综合评分:</strong> ${result.data.scores.comprehensive.toFixed(1)}</p>
+                        <h4>AI分析内容:</h4>
+                        <div class="ai-analysis-content">
+                            ${enhancedMarkdownParse(result.data.ai_analysis)}
+                        </div>
+                    `;
+                } else {
+                    output.innerHTML = `<p style="color: red;">API调用失败: ${result.error}</p>`;
+                }
+            } catch (error) {
+                output.innerHTML = `<p style="color: red;">请求失败: ${error.message}</p>`;
+            }
+        }
+        
+        // API test with AI
+        async function testAPIWithAI() {
+            const stockCode = document.getElementById('stockCode').value;
+            const output = document.getElementById('apiOutput');
+            
+            try {
+                const response = await fetch('http://localhost:8080/api/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        stock_code: stockCode,
+                        enable_ai: true
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    output.innerHTML = `
+                        <h4>AI API调用成功</h4>
+                        <p><strong>股票代码:</strong> ${result.data.stock_code}</p>
+                        <p><strong>股票名称:</strong> ${result.data.stock_name}</p>
+                        <p><strong>综合评分:</strong> ${result.data.scores.comprehensive.toFixed(1)}</p>
+                        <p><strong>Fallback Used:</strong> ${result.data.fallback_used ? 'Yes' : 'No'}</p>
+                        <h4>AI分析内容:</h4>
+                        <div class="ai-analysis-content">
+                            ${enhancedMarkdownParse(result.data.ai_analysis)}
+                        </div>
+                    `;
+                } else {
+                    output.innerHTML = `<p style="color: red;">AI API调用失败: ${result.error}</p>`;
+                }
+            } catch (error) {
+                output.innerHTML = `<p style="color: red;">AI请求失败: ${error.message}</p>`;
+            }
+        }
+        
+        // Load real data
+        async function loadRealData() {
+            const output = document.getElementById('realOutput');
+            
+            try {
+                const response = await fetch('/tmp/test_analysis.json');
+                const result = await response.json();
+                
+                if (result.success) {
+                    output.innerHTML = enhancedMarkdownParse(result.data.ai_analysis);
+                } else {
+                    output.innerHTML = `<p style="color: red;">加载真实数据失败</p>`;
+                }
+            } catch (error) {
+                // Fallback: use sample data
+                const sampleMarkdown = `# 📈 真实股票分析报告
+
+## 🏢 基本信息
+- **股票代码**: 000001
+- **股票名称**: 平安银行
+- **分析时间**: 2025-08-04 07:23:03
+
+## 📊 技术分析
+1. **均线趋势**: 多头排列
+2. **RSI指标**: 73.1 (超买区域)
+3. **MACD信号**: 看跌
+
+## 💰 基本面分析
+| 指标 | 值 | 评级 |
+|------|-----|------|
+| 市盈率 | 15.2倍 | 良好 |
+| 市净率 | 1.8倍 | 优秀 |
+
+> 投资有风险，入市需谨慎。
+
+**代码示例**: \`calculateRSI()\`
+
+\`\`\`javascript
+function calculateRSI(prices, period) {
+    return rsiValue;
+}
+\`\`\`
+
+这是一个[测试链接](https://example.com)。`;
+                
+                output.innerHTML = enhancedMarkdownParse(sampleMarkdown);
+            }
+        }
+        
+        // Initialize manual test on page load
+        window.onload = function() {
+            testManualMarkdown();
+        };
+    </script>
+</body>
+</html>

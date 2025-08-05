@@ -1,0 +1,224 @@
+<\!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown 渲染测试</title>
+    <\!-- GitHub Markdown CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.5.1/github-markdown.min.css">
+    <\!-- Highlight.js for code highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <\!-- Markdown rendering library -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <\!-- DOMPurify for security -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f6f8fa;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .markdown-body {
+            box-sizing: border-box;
+            min-width: 200px;
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 45px;
+        }
+        .test-input {
+            width: 100%;
+            height: 200px;
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .test-button {
+            background: #0366d6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+        .test-button:hover {
+            background: #0256cc;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Markdown 渲染测试</h1>
+        <p>测试修复后的markdown渲染功能，确保段落和格式正确显示。</p>
+        
+        <textarea class="test-input" id="markdownInput" placeholder="输入markdown文本..."># 股票分析报告
+
+## 技术分析
+
+### 主要指标
+- **RSI**: 65.4 (超买区域)
+- **MACD**: 金叉信号
+- **均线**: 20日均线上穿60日均线
+
+### 代码示例
+```javascript
+function calculateRSI(prices, period = 14) {
+    let gains = 0;
+    let losses = 0;
+    
+    for (let i = 1; i < prices.length; i++) {
+        const change = prices[i] - prices[i-1];
+        if (change > 0) {
+            gains += change;
+        } else {
+            losses += Math.abs(change);
+        }
+    }
+    
+    const avgGain = gains / period;
+    const avgLoss = losses / period;
+    const rs = avgGain / avgLoss;
+    
+    return 100 - (100 / (1 + rs));
+}
+```
+
+## 基本面分析
+
+| 指标 | 数值 | 评级 |
+|------|------|------|
+| PE | 15.2 | 合理 |
+| PB | 2.1 | 合理 |
+| ROE | 18.5% | 优秀 |
+
+## 投资建议
+
+> **风险提示**: 投资有风险，入市需谨慎
+
+1. **短期**: 观望
+2. **中期**: 适量买入
+3. **长期**: 持有
+
+~~过时的分析内容~~
+
+**重点关注**:
+- 盈利能力持续改善
+- 行业地位稳固
+- 估值相对合理
+
+[更多分析详情](#技术分析)</textarea>
+        
+        <button class="test-button" onclick="testMarkdown()">测试渲染</button>
+        
+        <div class="markdown-body" id="output"></div>
+    </div>
+
+    <script>
+        // Professional markdown renderer using marked.js with highlight.js
+        function renderMarkdown(text) {
+            if (\!text) return '';
+            
+            // Configure marked for professional markdown rendering
+            marked.setOptions({
+                highlight: function(code, lang) {
+                    if (lang && hljs.getLanguage(lang)) {
+                        try {
+                            return hljs.highlight(code, { language: lang }).value;
+                        } catch (err) {
+                            console.warn('Highlight.js error:', err);
+                        }
+                    }
+                    return hljs.highlightAuto(code).value;
+                },
+                breaks: false,          // Don't convert all line breaks to <br>
+                gfm: true,             // GitHub Flavored Markdown
+                headerIds: false,      // Don't generate header IDs
+                mangle: false,         // Don't mangle email addresses
+                sanitize: false,       // We'll use DOMPurify instead
+                smartLists: true,      // Use smart lists
+                smartypants: true,     // Use smartypants for typography
+                pedantic: false,       // Be more relaxed about markdown syntax
+                tables: true,          // Enable tables
+                strikethrough: true,   // Enable strikethrough
+                xhtml: false           // Don't require XHTML syntax
+            });
+            
+            // Intelligent text preprocessing for proper markdown formatting
+            let processedText = text
+                // Normalize line endings
+                .replace(/\r\n/g, '\n')
+                .replace(/\r/g, '\n')
+                // Ensure proper paragraph separation (double line breaks)
+                .replace(/\n{2,}/g, '\n\n')
+                // Handle list items - ensure they have proper spacing
+                .replace(/^(\s*[-*+]\s+)/gm, '\n$1')
+                .replace(/^(\s*\d+\.\s+)/gm, '\n$1')
+                // Handle headers - ensure they have proper spacing
+                .replace(/^#{1,6}\s+/gm, '\n\n$&')
+                // Handle code blocks - preserve their formatting
+                .replace(/```[\s\S]*?```/g, match => match.replace(/\n/g, '\n'))
+                .replace(/`[^`]*`/g, match => match)
+                // Handle blockquotes
+                .replace(/^>\s+/gm, '\n$&')
+                // Trim leading/trailing whitespace but preserve paragraph structure
+                .replace(/^\s+|\s+$/g, '')
+                // Remove empty lines at start/end
+                .replace(/^\n+|\n+$/g, '');
+            
+            // Parse markdown to HTML
+            const rawHtml = marked.parse(processedText);
+            
+            // Sanitize HTML for security
+            const cleanHtml = DOMPurify.sanitize(rawHtml, {
+                ALLOWED_TAGS: [
+                    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+                    'p', 'br', 'hr',
+                    'ul', 'ol', 'li',
+                    'blockquote', 'pre', 'code',
+                    'strong', 'em', 'del', 'ins',
+                    'table', 'thead', 'tbody', 'tr', 'th', 'td',
+                    'a', 'img',
+                    'div', 'span'
+                ],
+                ALLOWED_ATTR: [
+                    'href', 'src', 'alt', 'title', 'class',
+                    'id', 'style', 'target', 'rel'
+                ]
+            });
+            
+            return cleanHtml;
+        }
+        
+        function testMarkdown() {
+            const input = document.getElementById('markdownInput').value;
+            const output = document.getElementById('output');
+            
+            const rendered = renderMarkdown(input);
+            output.innerHTML = rendered;
+            
+            // Initialize highlight.js for code blocks
+            document.querySelectorAll('pre code').forEach((block) => {
+                hljs.highlightElement(block);
+            });
+        }
+        
+        // Auto-render on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            testMarkdown();
+        });
+    </script>
+</body>
+</html>
+EOF < /dev/null
